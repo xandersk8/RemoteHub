@@ -1,0 +1,15 @@
+[Unit]
+Description=Remote Hub PC Controller
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/ShutdownPC/server
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+Environment=PORT=3000
+Environment=JWT_SECRET=supersecretkey-remote-pc
+
+[Install]
+WantedBy=multi-user.target

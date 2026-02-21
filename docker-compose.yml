@@ -1,0 +1,12 @@
+services:
+  remote-hub:
+    build: .
+    container_name: remote-hub
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./server/users.db:/app/server/users.db
+    environment:
+      - JWT_SECRET=supersecretkey-remote-pc
+      - PORT=3000

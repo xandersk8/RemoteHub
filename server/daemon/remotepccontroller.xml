@@ -1,0 +1,33 @@
+<service>
+	<id>remotepccontroller.exe</id>
+	<name>Remote PC Controller</name>
+	<description>Remote Shutdown, Restart and Wake on LAN Controller</description>
+	<executable>C:\Program Files\nodejs\node.exe</executable>
+	<argument>--harmony</argument>
+	<argument>F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js</argument>
+	<argument>--file</argument>
+	<argument>F:\APP\ShutdownPC\server\server.js</argument>
+	<argument>--scriptoptions=</argument>
+	<argument>--log</argument>
+	<argument>Remote PC Controller wrapper</argument>
+	<argument>--grow</argument>
+	<argument>0.25</argument>
+	<argument>--wait</argument>
+	<argument>1</argument>
+	<argument>--maxrestarts</argument>
+	<argument>3</argument>
+	<argument>--abortonerror</argument>
+	<argument>n</argument>
+	<argument>--stopparentfirst</argument>
+	<argument>undefined</argument>
+	<logmode>rotate</logmode>
+	<stoptimeout>30sec</stoptimeout>
+	<env name="PORT" value="3000"/>
+	<env name="JWT_SECRET" value="supersecretkey-remote-pc"/>
+	<serviceaccount>
+		<domain>MASTER</domain>
+		<user>LocalSystem</user>
+		<password></password>
+	</serviceaccount>
+	<workingdirectory>F:\APP\ShutdownPC\server</workingdirectory>
+</service>
