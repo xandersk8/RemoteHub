@@ -63,7 +63,16 @@ echo "📁 Base de instalação: $BASE_DIR"
 # 4. Install Server Dependencies
 echo "🧠 Instalando dependências do Servidor..."
 cd "$BASE_DIR/server"
-npm install --production
+
+# Remove existing node_modules to avoid architecture pollution (common when transferring files from Windows)
+if [ -d "node_modules" ]; then
+    echo "🧹 Limpando node_modules antigos..."
+    rm -rf node_modules
+fi
+
+# Install and force rebuild of native modules (like sqlite3) from source
+echo "🔨 Compilando módulos nativos para sua arquitetura..."
+npm install --production --build-from-source
 
 # 5. Build Client (Frontend)
 if [ -d "$BASE_DIR/client/src" ]; then
