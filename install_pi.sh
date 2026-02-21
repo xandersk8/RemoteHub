@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Remote Hub PC - Raspberry Pi Native Installer
+# Remote Hub PC - Universal Raspberry Pi Native Installer
 # This script installs Node.js, dependencies, and sets up the app as a system service.
+# Supports ARMv6, ARMv7 (Pi 1, 2, 3), ARMv8 (Pi 4, 5) and x64.
 
 set -e
 
@@ -12,15 +13,47 @@ echo "------------------------------------------------"
 # 1. Update and install basic dependencies
 echo "📦 Atualizando repositórios e instalando dependências..."
 sudo apt-get update
-sudo apt-get install -y samba-common-bin iputils-ping git curl
+sudo apt-get install -y samba-common-bin iputils-ping git curl xz-utils
 
-# 2. Check if Node.js is installed
+# 2. Universal Node.js Installation (Detect Architecture)
+ARCH=$(uname -m)
+NODE_MAJOR=20
+
 if ! command -v node &> /dev/null; then
-    echo "🟢 Node.js não encontrado. Instalando Node.js 20..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt-get install -y nodejs
+    echo "🟢 Node.js não encontrado. Detectando arquitetura: $ARCH"
+    
+    if [[ "$ARCH" == "x86_64" || "$ARCH" == "aarch64" ]]; then
+        echo "✅ Arquitetura suportada pelo NodeSource. Instalando..."
+        curl -fsSL https://deb.nodesource.com/setup_$NODE_MAJOR.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+    else
+        echo "⚠️  Arquitetura base ($ARCH) não suportada pelo NodeSource."
+        echo "📥 Baixando binários oficiais da Nodejs.org..."
+        
+        # Determine specific ARM version
+        if [[ "$ARCH" == armv7* ]]; then
+            NODE_ARCH="armv7l"
+        elif [[ "$ARCH" == armv6* ]]; then
+            NODE_ARCH="armv6l"
+        else
+            echo "❌ Erro: Arquitetura $ARCH desconhecida."
+            exit 1
+        fi
+        
+        # Build URL for official binary
+        NODE_VER=$(curl -sL https://nodejs.org/download/release/latest-v$NODE_MAJOR.x/ | grep -o "node-v$NODE_MAJOR\.[0-9]*\.[0-9]*-linux-$NODE_ARCH\.tar\.xz" | head -n 1)
+        URL="https://nodejs.org/dist/latest-v$NODE_MAJOR.x/$NODE_VER"
+        
+        echo "📦 Fazendo download de: $URL"
+        curl -L "$URL" -o node_archive.tar.xz
+        
+        echo "🔧 Extraindo e instalando em /usr/local..."
+        sudo tar -xJf node_archive.tar.xz --strip-components=1 -C /usr/local
+        rm node_archive.tar.xz
+        echo "✅ Node.js instalado com sucesso manualmente."
+    fi
 else
-    echo "✅ Node.js já está instalado."
+    echo "✅ Node.js já está instalado ($(node -v))."
 fi
 
 # 3. Setup Project Folders
@@ -33,11 +66,11 @@ cd "$BASE_DIR/server"
 npm install --production
 
 # 5. Build Client (Frontend)
-# Note: This requires the dist folder to be present. 
-# If running on Pi, we usually deliver the pre-built 'dist' or build it now.
 if [ -d "$BASE_DIR/client/src" ]; then
     echo "🖥️  Arquivos fonte do cliente encontrados. Construindo frontend..."
     cd "$BASE_DIR/client"
+    # For low-memory Pi (like 2B/Zero), we increase memory limit for build
+    export NODE_OPTIONS="--max-old-space-size=1024"
     npm install
     npm run build
 else
