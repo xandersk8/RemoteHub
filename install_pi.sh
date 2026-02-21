@@ -91,7 +91,7 @@ User=$(whoami)
 WorkingDirectory=$BASE_DIR/server
 ExecStart=$(command -v node) server.js
 Restart=on-failure
-Environment=PORT=3000
+Environment=PORT=3080
 Environment=JWT_SECRET=supersecretkey-remote-pc
 
 [Install]
@@ -106,6 +106,6 @@ sudo systemctl start remote-hub
 
 echo "------------------------------------------------"
 echo "✅ Instalação concluída com sucesso!"
-echo "📡 O Hub está rodando na porta 3000."
-echo "🌍 Acesse usando http://$(hostname -I | awk '{print $1}'):3000"
+echo "📡 O Hub está rodando na porta 3080."
+echo "🌍 Acesse usando http://$(hostname -I | awk '{print $1}'):3080"
 echo "------------------------------------------------"

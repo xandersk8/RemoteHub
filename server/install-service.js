@@ -9,7 +9,7 @@ const svc = new Service({
     env: [
         {
             name: "PORT",
-            value: 3000
+            value: 3080
         },
         {
             name: "JWT_SECRET",

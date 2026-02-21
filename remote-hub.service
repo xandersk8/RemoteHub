@@ -8,7 +8,7 @@ User=pi
 WorkingDirectory=/home/pi/ShutdownPC/server
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
-Environment=PORT=3000
+Environment=PORT=3080
 Environment=JWT_SECRET=supersecretkey-remote-pc
 
 [Install]

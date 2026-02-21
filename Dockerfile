@@ -22,5 +22,5 @@ COPY --from=build-stage /app/client/dist ./client/dist
 # Copy backend source
 COPY server/ ./server/
 
-EXPOSE 3000
+EXPOSE 3080
 CMD ["node", "server/server.js"]

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_URL = `http://${window.location.hostname}:3000/api`;
+const API_URL = `http://${window.location.hostname}:3080/api`;
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);

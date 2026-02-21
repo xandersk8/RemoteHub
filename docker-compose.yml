@@ -4,9 +4,9 @@ services:
     container_name: remote-hub
     restart: always
     ports:
-      - "3000:3000"
+      - "3080:3080"
     volumes:
       - ./server/users.db:/app/server/users.db
     environment:
       - JWT_SECRET=supersecretkey-remote-pc
-      - PORT=3000
+      - PORT=3080
