@@ -2,18 +2,22 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_URL = `http://${window.location.hostname}:3080/api`;
+const API_URL = `${window.location.protocol}//${window.location.host}/api`;
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [view, setView] = useState('dashboard'); // 'dashboard', 'add-device'
+  const [view, setView] = useState('dashboard'); // 'dashboard', 'add-device', 'timer'
   const [devices, setDevices] = useState([]);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [editingDeviceId, setEditingDeviceId] = useState(null);
+  const [timers, setTimers] = useState([]);
+  const [timerData, setTimerData] = useState({ deviceId: '', action: 'shutdown', minutes: 30 });
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
 
   // New Device Form
   const [newDevice, setNewDevice] = useState({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' });
@@ -34,6 +38,14 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [isLoggedIn, devices.length, view]);
+
+  useEffect(() => {
+    if (isLoggedIn && view === 'timer') {
+      fetchTimers();
+      const interval = setInterval(fetchTimers, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn, view]);
 
   // Effect to clear status message after 5 seconds
   useEffect(() => {
@@ -107,22 +119,43 @@ function App() {
     setView('dashboard');
   };
 
-  const handleAddDevice = async (e) => {
+  const handleSaveDevice = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/devices`, newDevice, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      if (editingDeviceId) {
+        await axios.put(`${API_URL}/devices/${editingDeviceId}`, newDevice, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setStatus('Dispositivo atualizado!');
+      } else {
+        await axios.post(`${API_URL}/devices`, newDevice, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setStatus('Dispositivo adicionado!');
+      }
       fetchDevices();
       setView('dashboard');
       setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' });
-      setStatus('Dispositivo adicionado com sucesso!');
+      setEditingDeviceId(null);
     } catch (err) {
-      setError('Erro ao adicionar dispositivo');
+      setError('Erro ao salvar dispositivo');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditDevice = (device) => {
+    setEditingDeviceId(device.id);
+    setNewDevice({
+      name: device.name,
+      ip: device.ip,
+      mac: device.mac,
+      type: device.type,
+      win_user: device.win_user || '',
+      win_pass: device.win_pass || ''
+    });
+    setView('add-device');
   };
 
   const handleDeleteDevice = async (id) => {
@@ -153,6 +186,45 @@ function App() {
     }
   };
 
+  const fetchTimers = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/timer`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTimers(response.data);
+    } catch (err) {
+      console.error('Failed to fetch timers');
+    }
+  };
+
+  const handleSetTimer = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/timer`, timerData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setStatus(response.data.message);
+      fetchTimers();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro ao definir timer');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelTimer = async (deviceId) => {
+    try {
+      await axios.delete(`${API_URL}/timer/${deviceId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setStatus('Timer cancelado');
+      fetchTimers();
+    } catch (err) {
+      setError('Erro ao cancelar timer');
+    }
+  };
+
   const sendWol = async (mac) => {
     setLoading(true);
     setStatus('Enviando Magic Packet...');
@@ -163,6 +235,27 @@ function App() {
       setStatus(response.data.message);
     } catch (err) {
       setError('Erro ao enviar sinal de ligar (WoL)');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setError('As senhas não coincidem');
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.put(`${API_URL}/profile/password`, { newPassword: passwordData.newPassword }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setStatus('Senha alterada com sucesso!');
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+      setView('dashboard');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro ao alterar senha');
     } finally {
       setLoading(false);
     }
@@ -184,14 +277,14 @@ function App() {
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Usuário</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">person</span>
-                <input type="text" className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="admin" value={username} onChange={(e) => setUsername(e.target.value)} required />
+                <input type="text" className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all text-slate-900 dark:text-white" placeholder="admin" value={username} onChange={(e) => setUsername(e.target.value)} required />
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Senha</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">lock</span>
-                <input type="password" className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <input type="password" className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all text-slate-900 dark:text-white" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
             </div>
             <button disabled={loading} className="w-full h-14 bg-primary text-white rounded-2xl font-bold text-lg shadow-lg shadow-primary/25 active:scale-[0.98] transition-all">
@@ -211,7 +304,7 @@ function App() {
           <div className="bg-primary/20 p-2 rounded-lg">
             <span className="material-symbols-outlined text-primary text-2xl">router</span>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Device Dashboard</h1>
+          <h1 className="text-xl font-bold tracking-tight">Remote Hub</h1>
         </div>
         <button onClick={handleLogout} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
           <span className="material-symbols-outlined">logout</span>
@@ -264,9 +357,14 @@ function App() {
                         </div>
                       </div>
                     </div>
-                    <button onClick={() => handleDeleteDevice(device.id)} className="text-slate-400 hover:text-red-500 transition-colors p-2">
-                      <span className="material-symbols-outlined">delete</span>
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEditDevice(device)} className="text-slate-400 hover:text-primary transition-colors p-2">
+                        <span className="material-symbols-outlined">edit</span>
+                      </button>
+                      <button onClick={() => handleDeleteDevice(device.id)} className="text-slate-400 hover:text-red-500 transition-colors p-2">
+                        <span className="material-symbols-outlined">delete</span>
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 p-4 pt-0">
                     <button
@@ -297,16 +395,145 @@ function App() {
               </div>
             )}
           </>
+        ) : view === 'timer' ? (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+            <h2 className="text-2xl font-black mb-6 tracking-tight">Agendador (Timer)</h2>
+
+            <form onSubmit={handleSetTimer} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm mb-8">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Dispositivo</label>
+                <select
+                  className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                  value={timerData.deviceId}
+                  onChange={e => setTimerData({ ...timerData, deviceId: e.target.value })}
+                  required
+                >
+                  <option value="">Selecione um computador...</option>
+                  {devices.map(d => (
+                    <option key={d.id} value={d.id}>{d.name} ({d.ip})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Ação</label>
+                  <select
+                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                    value={timerData.action}
+                    onChange={e => setTimerData({ ...timerData, action: e.target.value })}
+                  >
+                    <option value="shutdown">Desligar</option>
+                    <option value="restart">Reiniciar</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Minutos</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                    value={timerData.minutes}
+                    onChange={e => setTimerData({ ...timerData, minutes: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button disabled={loading} className="w-full h-14 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
+                {loading ? 'Agendando...' : 'Iniciar Timer'}
+              </button>
+            </form>
+
+            <div className="space-y-4 pb-12">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Timers Ativos</h3>
+              {timers.length === 0 ? (
+                <div className="bg-slate-100 dark:bg-slate-950 p-8 rounded-2xl text-center border border-dashed border-slate-300 dark:border-slate-800">
+                  <p className="text-slate-400 font-medium">Nenhum timer agendado</p>
+                </div>
+              ) : (
+                timers.map(t => (
+                  <div key={t.deviceId} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-sm border-l-4 border-l-primary">
+                    <div>
+                      <h4 className="font-bold">{t.name}</h4>
+                      <p className="text-xs text-slate-500">
+                        {t.action === 'shutdown' ? 'Desligando' : 'Reiniciando'} em{' '}
+                        <span className="text-primary font-bold">
+                          {Math.max(0, Math.ceil((t.expiresAt - Date.now()) / 60000))} min
+                        </span>
+                      </p>
+                    </div>
+                    <button onClick={() => cancelTimer(t.deviceId)} className="size-10 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center">
+                      <span className="material-symbols-outlined text-xl">close</span>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        ) : view === 'profile' ? (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+            <h2 className="text-2xl font-black mb-6 tracking-tight">Seu Perfil</h2>
+
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm mb-8 flex flex-col items-center">
+              <div className="size-24 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-primary text-5xl">person</span>
+              </div>
+              <h3 className="text-xl font-bold">{username}</h3>
+              <p className="text-slate-500 text-sm">Administrador do Sistema</p>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Alterar Senha</h3>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Nova Senha</label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">lock</span>
+                    <input
+                      type="password"
+                      className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-12 pr-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                      placeholder="Mínimo 6 caracteres"
+                      value={passwordData.newPassword}
+                      onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Confirmar Senha</label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">verified_user</span>
+                    <input
+                      type="password"
+                      className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-12 pr-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                      placeholder="Repita a nova senha"
+                      value={passwordData.confirmPassword}
+                      onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button disabled={loading} className="w-full h-14 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
+                {loading ? 'Salvando...' : 'Atualizar Senha'}
+              </button>
+            </form>
+          </motion.div>
         ) : (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <header className="flex items-center gap-4 mb-8">
-              <button onClick={() => setView('dashboard')} className="size-10 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
+              <button onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' }); }} className="size-10 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
                 <span className="material-symbols-outlined text-primary">arrow_back_ios_new</span>
               </button>
-              <h2 className="text-2xl font-extrabold tracking-tight">Adicionar Dispositivo</h2>
+              <h2 className="text-2xl font-extrabold tracking-tight">{editingDeviceId ? 'Editar Dispositivo' : 'Adicionar Dispositivo'}</h2>
             </header>
 
-            <form onSubmit={handleAddDevice} className="space-y-8">
+            <form onSubmit={handleSaveDevice} className="space-y-8">
               <section className="space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="material-symbols-outlined text-primary text-sm">info</span>
@@ -380,9 +607,9 @@ function App() {
               <div className="pt-4 pb-12">
                 <button type="submit" disabled={loading} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-lg shadow-xl shadow-primary/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest">
                   <span className="material-symbols-outlined">save</span>
-                  {loading ? 'Salvando...' : 'Salvar Dispositivo'}
+                  {loading ? 'Salvando...' : editingDeviceId ? 'Atualizar Dispositivo' : 'Salvar Dispositivo'}
                 </button>
-                <button type="button" onClick={() => setView('dashboard')} className="w-full py-4 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 transition-colors">Cancelar</button>
+                <button type="button" onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' }); }} className="w-full py-4 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 transition-colors">Cancelar</button>
               </div>
             </form>
           </motion.div>
@@ -437,12 +664,12 @@ function App() {
             <span className="material-symbols-outlined">analytics</span>
             <span className="text-[10px] font-bold uppercase tracking-tighter">Logs</span>
           </button>
-          <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 opacity-50">
-            <span className="material-symbols-outlined">schedule</span>
+          <button onClick={() => setView('timer')} className={`flex flex-col items-center gap-1 ${view === 'timer' ? 'text-primary' : 'text-slate-400'}`}>
+            <span className={`material-symbols-outlined ${view === 'timer' ? 'fill-icon' : ''}`}>schedule</span>
             <span className="text-[10px] font-bold uppercase tracking-tighter">Timer</span>
           </button>
-          <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 opacity-50">
-            <span className="material-symbols-outlined">person</span>
+          <button onClick={() => setView('profile')} className={`flex flex-col items-center gap-1 ${view === 'profile' ? 'text-primary' : 'text-slate-400'}`}>
+            <span className={`material-symbols-outlined ${view === 'profile' ? 'fill-icon' : ''}`}>person</span>
             <span className="text-[10px] font-bold uppercase tracking-tighter">Perfil</span>
           </button>
         </div>

@@ -37,10 +37,16 @@ db.serialize(() => {
     db.get("SELECT * FROM users WHERE username = ?", [defaultUser], (err, row) => {
         if (err) {
             console.error(err.message);
-        } else if (!row) {
+        } else {
             const hash = bcrypt.hashSync(defaultPass, 10);
-            db.run("INSERT INTO users (username, password) VALUES (?, ?)", [defaultUser, hash]);
-            console.log("Default admin user created.");
+            if (!row) {
+                db.run("INSERT INTO users (username, password) VALUES (?, ?)", [defaultUser, hash]);
+                console.log("Default admin user created.");
+            } else {
+                // Force reset admin password to 'admin123' to ensure user can log in
+                db.run("UPDATE users SET password = ? WHERE username = ?", [hash, defaultUser]);
+                console.log("Admin password force-reset to admin123.");
+            }
         }
     });
 });
@@ -48,7 +54,7 @@ db.serialize(() => {
 module.exports = {
     getUserByUsername: (username) => {
         return new Promise((resolve, reject) => {
-            db.get("SELECT * FROM users WHERE username = ?", [username], (err, row) => {
+            db.get("SELECT * FROM users WHERE username = ? COLLATE NOCASE", [username], (err, row) => {
                 if (err) reject(err);
                 else resolve(row);
             });
@@ -79,9 +85,30 @@ module.exports = {
             });
         });
     },
+    updateDevice: (id, userId, name, ip, mac, type, win_user, win_pass) => {
+        return new Promise((resolve, reject) => {
+            db.run(
+                "UPDATE devices SET name = ?, ip = ?, mac = ?, type = ?, win_user = ?, win_pass = ? WHERE id = ? AND user_id = ?",
+                [name, ip, mac, type, win_user, win_pass, id, userId],
+                function (err) {
+                    if (err) reject(err);
+                    else resolve({ changes: this.changes });
+                }
+            );
+        });
+    },
     deleteDevice: (deviceId, userId) => {
         return new Promise((resolve, reject) => {
             db.run("DELETE FROM devices WHERE id = ? AND user_id = ?", [deviceId, userId], function (err) {
+                if (err) reject(err);
+                else resolve({ changes: this.changes });
+            });
+        });
+    },
+    updateUserPassword: (userId, newPassword) => {
+        return new Promise((resolve, reject) => {
+            const hash = bcrypt.hashSync(newPassword, 10);
+            db.run("UPDATE users SET password = ? WHERE id = ?", [hash, userId], function (err) {
                 if (err) reject(err);
                 else resolve({ changes: this.changes });
             });

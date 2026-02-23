@@ -22,7 +22,7 @@
 	<argument>undefined</argument>
 	<logmode>rotate</logmode>
 	<stoptimeout>30sec</stoptimeout>
-	<env name="PORT" value="3000"/>
+	<env name="PORT" value="3080"/>
 	<env name="JWT_SECRET" value="supersecretkey-remote-pc"/>
 	<serviceaccount>
 		<domain>MASTER</domain>

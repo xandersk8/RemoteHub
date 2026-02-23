@@ -36,16 +36,28 @@ const authenticateToken = (req, res, next) => {
 
 // Auth endpoints
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
+    let { username, password } = req.body;
+    username = username?.trim();
+    password = password?.trim();
+    console.log(`Login attempt for username: [${username}]`);
     try {
         const user = await db.getUserByUsername(username);
-        if (!user || !bcrypt.compareSync(password, user.password)) {
+        if (!user) {
+            console.log(`User [${username}] not found in database`);
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const isMatch = bcrypt.compareSync(password, user.password);
+        console.log(`Password match for [${username}]: ${isMatch}`);
+
+        if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
         const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, username: user.username });
     } catch (error) {
+        console.error('Login error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -70,12 +82,35 @@ app.post('/api/devices', authenticateToken, async (req, res) => {
     }
 });
 
+app.put('/api/devices/:id', authenticateToken, async (req, res) => {
+    const { name, ip, mac, type, win_user, win_pass } = req.body;
+    try {
+        await db.updateDevice(req.params.id, req.user.id, name, ip, mac, type || 'desktop', win_user, win_pass);
+        res.json({ message: 'Device updated successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating device' });
+    }
+});
+
 app.delete('/api/devices/:id', authenticateToken, async (req, res) => {
     try {
         await db.deleteDevice(req.params.id, req.user.id);
         res.json({ message: 'Device deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting device' });
+    }
+});
+
+app.put('/api/profile/password', authenticateToken, async (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ message: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    }
+    try {
+        await db.updateUserPassword(req.user.id, newPassword);
+        res.json({ message: 'Senha alterada com sucesso!' });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao alterar senha.' });
     }
 });
 
@@ -180,15 +215,112 @@ app.post('/api/command', authenticateToken, async (req, res) => {
 // Wake on LAN endpoint
 app.post('/api/wol', authenticateToken, (req, res) => {
     const { mac } = req.body;
-    if (!mac) return res.status(400).json({ message: 'MAC Address is required' });
+    if (!mac) return res.status(400).json({ message: 'MAC address required' });
 
-    wol.wake(mac, (err) => {
-        if (err) {
-            console.error('WoL Error:', err);
-            return res.status(500).json({ message: 'Failed to send Magic Packet' });
+    try {
+        wol.wake(mac, (error) => {
+            if (error) return res.status(500).json({ message: 'WoL failed' });
+            res.json({ message: 'Magic Packet sent successfully' });
+        });
+    } catch (e) {
+        res.status(500).json({ message: 'WoL error' });
+    }
+});
+
+// Timer / Scheduled Tasks Engine
+const scheduledTasks = new Map();
+
+app.post('/api/timer', authenticateToken, async (req, res) => {
+    const { deviceId, action, minutes } = req.body;
+    if (!deviceId || !action || !minutes) return res.status(400).json({ message: 'Missing parameters' });
+
+    // Find device to get IP and credentials
+    let device;
+    try {
+        const allDevices = await db.getDevices(req.user.id);
+        device = allDevices.find(d => d.id === deviceId);
+    } catch (err) {
+        return res.status(500).json({ message: 'Error fetching device' });
+    }
+
+    if (!device) return res.status(404).json({ message: 'Device not found' });
+
+    // Cancel existing timer if any
+    if (scheduledTasks.has(deviceId)) {
+        clearTimeout(scheduledTasks.get(deviceId).timeoutId);
+    }
+
+    const executionTime = Date.now() + (minutes * 60 * 1000);
+
+    const timeoutId = setTimeout(async () => {
+        console.log(`Executing scheduled ${action} for ${device.name} (${device.ip})`);
+        // Reuse command logic (internal call or refactor)
+        // For simplicity, we trigger the endpoint's logic manually here
+        const credentials = (device.win_user && device.win_pass) ? { user: device.win_user, pass: device.win_pass } : null;
+        const targetIp = device.ip;
+        const isLocal = targetIp === '127.0.0.1' || targetIp === 'localhost';
+
+        let flag = '';
+        if (action === 'shutdown') flag = isWin ? '/s' : '-s';
+        else if (action === 'restart') flag = isWin ? '/r' : '-r';
+
+        let fullCommand = '';
+        if (isLocal) {
+            fullCommand = `shutdown ${flag} /t 10 /c "Scheduled-Remote-Hub"`;
+        } else {
+            if (isWin) {
+                fullCommand = `shutdown /m \\\\${targetIp} ${flag} /t 10 /c "Scheduled-Remote-Hub"`;
+            } else {
+                fullCommand = `net rpc shutdown -I ${targetIp} -U "${credentials.user}%${credentials.pass}" ${flag} -t 10 -C "Scheduled-Remote-Hub"`;
+            }
         }
-        res.json({ message: `Magic Packet sent to ${mac}` });
+
+        const runCmd = () => {
+            exec(fullCommand, (err, stdout, stderr) => {
+                if (err) console.error(`Scheduled command failed: ${stderr || err.message}`);
+                else console.log(`Scheduled command successful for ${targetIp}`);
+            });
+        };
+
+        if (isWin && !isLocal && credentials) {
+            exec(`net use \\\\${targetIp} /user:${credentials.user} ${credentials.pass}`, () => runCmd());
+        } else {
+            runCmd();
+        }
+
+        scheduledTasks.delete(deviceId);
+    }, minutes * 60 * 1000);
+
+    scheduledTasks.set(deviceId, {
+        timeoutId,
+        action,
+        minutes,
+        name: device.name,
+        expiresAt: executionTime
     });
+
+    res.json({ message: `Timer set: ${action} in ${minutes} minutes` });
+});
+
+app.get('/api/timer', authenticateToken, (req, res) => {
+    const list = Array.from(scheduledTasks.entries()).map(([deviceId, data]) => ({
+        deviceId,
+        action: data.action,
+        name: data.name,
+        expiresAt: data.expiresAt
+    }));
+    res.json(list);
+});
+
+app.delete('/api/timer/:deviceId', authenticateToken, (req, res) => {
+    const deviceId = parseInt(req.params.deviceId);
+    if (scheduledTasks.has(deviceId)) {
+        clearTimeout(scheduledTasks.get(deviceId).timeoutId);
+        scheduledTasks.delete(deviceId);
+        res.json({ message: 'Timer cancelled' });
+    } else {
+        res.status(404).json({ message: 'No timer found for this device' });
+    }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

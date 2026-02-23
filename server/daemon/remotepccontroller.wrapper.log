@@ -1,2 +1,2 @@
-2026-02-20 23:26:37 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
-2026-02-20 23:26:37 - Started 6648
+2026-02-23 00:22:28 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2026-02-23 00:22:28 - Started 13084
