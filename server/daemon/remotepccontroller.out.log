@@ -1,6 +1,4 @@
-[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
 Server running on port 3080
 To access from phone, use http://[IP_ADDRESS]:3080
 Admin password force-reset to admin123.
-Login attempt for username: [admin]
-Password match for [admin]: true

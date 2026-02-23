@@ -138,7 +138,8 @@ const isWin = process.platform === "win32";
 
 // Command endpoints
 app.post('/api/command', authenticateToken, async (req, res) => {
-    const { action, ip, deviceId } = req.body;
+    let { action, ip, deviceId } = req.body;
+    if (deviceId) deviceId = parseInt(deviceId);
 
     const targetIp = ip || '127.0.0.1';
     const isLocal = targetIp === '127.0.0.1' || targetIp === 'localhost';
@@ -166,11 +167,11 @@ app.post('/api/command', authenticateToken, async (req, res) => {
     else return res.status(400).json({ message: 'Ação inválida' });
 
     if (isLocal) {
-        fullCommand = `shutdown ${flag} /t 10 /c "RemotePC-Controller"`;
+        fullCommand = `shutdown ${flag} /f /t 10 /c "RemotePC-Controller"`;
     } else {
         if (isWin) {
             // Windows to Windows Command
-            fullCommand = action === 'abort' ? `shutdown /m \\\\${targetIp} /a` : `shutdown /m \\\\${targetIp} ${flag} /t 10 /c "RemotePC-Controller"`;
+            fullCommand = action === 'abort' ? `shutdown /m \\\\${targetIp} /a` : `shutdown /m \\\\${targetIp} ${flag} /f /t 10 /c "RemotePC-Controller"`;
         } else {
             // Linux/Docker to Windows Command (using net rpc)
             if (!credentials) {
@@ -181,6 +182,7 @@ app.post('/api/command', authenticateToken, async (req, res) => {
     }
 
     const executeCommand = () => {
+        console.log(`Executing command: ${fullCommand}`);
         exec(fullCommand, (err, stdout, stderr) => {
             if (err) {
                 console.error(`Command failed: ${stderr || err.message}`);
@@ -231,19 +233,37 @@ app.post('/api/wol', authenticateToken, (req, res) => {
 const scheduledTasks = new Map();
 
 app.post('/api/timer', authenticateToken, async (req, res) => {
-    const { deviceId, action, minutes } = req.body;
+    let { deviceId, action, minutes } = req.body;
+    if (deviceId) deviceId = parseInt(deviceId);
     if (!deviceId || !action || !minutes) return res.status(400).json({ message: 'Missing parameters' });
 
     // Find device to get IP and credentials
     let device;
     try {
         const allDevices = await db.getDevices(req.user.id);
-        device = allDevices.find(d => d.id === deviceId);
+        console.log(`[Timer] User ID: ${req.user.id}, Seeking Device ID: ${deviceId} (${typeof deviceId})`);
+        console.log(`[Timer] Available Devices:`, allDevices.map(d => `${d.id} (${typeof d.id})`));
+
+        device = allDevices.find(d => String(d.id) === String(deviceId));
     } catch (err) {
+        console.error('[Timer] Error fetching devices:', err);
         return res.status(500).json({ message: 'Error fetching device' });
     }
 
-    if (!device) return res.status(404).json({ message: 'Device not found' });
+    if (!device) {
+        console.warn(`[Timer] Device ${deviceId} not found for user ${req.user.id}`);
+        const debugInfo = {
+            seekingId: deviceId,
+            seekingIdType: typeof deviceId,
+            userId: req.user.id,
+            foundCount: allDevices.length,
+            availableIds: allDevices.map(d => d.id)
+        };
+        return res.status(404).json({
+            message: 'Device not found',
+            debug: debugInfo
+        });
+    }
 
     // Cancel existing timer if any
     if (scheduledTasks.has(deviceId)) {
@@ -266,16 +286,17 @@ app.post('/api/timer', authenticateToken, async (req, res) => {
 
         let fullCommand = '';
         if (isLocal) {
-            fullCommand = `shutdown ${flag} /t 10 /c "Scheduled-Remote-Hub"`;
+            fullCommand = `shutdown ${flag} /f /t 10 /c "Scheduled-Remote-Hub"`;
         } else {
             if (isWin) {
-                fullCommand = `shutdown /m \\\\${targetIp} ${flag} /t 10 /c "Scheduled-Remote-Hub"`;
+                fullCommand = `shutdown /m \\\\${targetIp} ${flag} /f /t 10 /c "Scheduled-Remote-Hub"`;
             } else {
-                fullCommand = `net rpc shutdown -I ${targetIp} -U "${credentials.user}%${credentials.pass}" ${flag} -t 10 -C "Scheduled-Remote-Hub"`;
+                fullCommand = `net rpc shutdown -I ${targetIp} -U "${credentials.user}%${credentials.pass}" ${flag} -f -t 10 -C "Scheduled-Remote-Hub"`;
             }
         }
 
         const runCmd = () => {
+            console.log(`Executing scheduled command: ${fullCommand}`);
             exec(fullCommand, (err, stdout, stderr) => {
                 if (err) console.error(`Scheduled command failed: ${stderr || err.message}`);
                 else console.log(`Scheduled command successful for ${targetIp}`);
