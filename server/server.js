@@ -55,7 +55,7 @@ app.post('/api/login', async (req, res) => {
         }
 
         const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-        res.json({ token, username: user.username });
+        res.json({ token, username: user.username, theme: user.theme || 'dark' });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -73,9 +73,10 @@ app.get('/api/devices', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/devices', authenticateToken, async (req, res) => {
-    const { name, ip, mac, type, win_user, win_pass } = req.body;
+    const { name, ip, mac, type, group_name, win_user, win_pass } = req.body;
     try {
-        const result = await db.addDevice(req.user.id, name, ip, mac, type || 'desktop', win_user, win_pass);
+        const result = await db.addDevice(req.user.id, name, ip, mac, type || 'desktop', group_name || 'Geral', win_user, win_pass);
+        await db.addLog(req.user.id, `Adicionou dispositivo: ${name}`);
         res.json({ id: result.id, message: 'Device added successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error adding device' });
@@ -83,9 +84,10 @@ app.post('/api/devices', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/devices/:id', authenticateToken, async (req, res) => {
-    const { name, ip, mac, type, win_user, win_pass } = req.body;
+    const { name, ip, mac, type, group_name, win_user, win_pass } = req.body;
     try {
-        await db.updateDevice(req.params.id, req.user.id, name, ip, mac, type || 'desktop', win_user, win_pass);
+        await db.updateDevice(req.params.id, req.user.id, name, ip, mac, type || 'desktop', group_name || 'Geral', win_user, win_pass);
+        await db.addLog(req.user.id, `Atualizou dispositivo: ${name}`);
         res.json({ message: 'Device updated successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error updating device' });
@@ -108,9 +110,42 @@ app.put('/api/profile/password', authenticateToken, async (req, res) => {
     }
     try {
         await db.updateUserPassword(req.user.id, newPassword);
+        await db.addLog(req.user.id, `Alterou a própria senha`);
         res.json({ message: 'Senha alterada com sucesso!' });
     } catch (error) {
         res.status(500).json({ message: 'Erro ao alterar senha.' });
+    }
+});
+
+app.put('/api/profile/theme', authenticateToken, async (req, res) => {
+    const { theme } = req.body;
+    if (!['light', 'dark'].includes(theme)) {
+        return res.status(400).json({ message: 'Tema inválido.' });
+    }
+    try {
+        await db.updateUserTheme(req.user.id, theme);
+        res.json({ message: 'Tema atualizado com sucesso!' });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao atualizar tema.' });
+    }
+});
+
+// Activity Logs endpoints
+app.get('/api/logs', authenticateToken, async (req, res) => {
+    try {
+        const logs = await db.getLogs(req.user.id);
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao buscar logs.' });
+    }
+});
+
+app.delete('/api/logs', authenticateToken, async (req, res) => {
+    try {
+        await db.clearLogs(req.user.id);
+        res.json({ message: 'Histórico limpo com sucesso!' });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao limpar logs.' });
     }
 });
 
@@ -211,6 +246,67 @@ app.post('/api/command', authenticateToken, async (req, res) => {
         });
     } else {
         executeCommand();
+    }
+
+    // Add activity log
+    try {
+        const deviceName = deviceId ? (await db.getDevices(req.user.id)).find(d => d.id === deviceId)?.name : targetIp;
+        await db.addLog(req.user.id, `Enviou ${action} para ${deviceName || targetIp}`);
+    } catch (e) { }
+});
+
+// Group Command endpoint (Bulk)
+app.post('/api/command/group', authenticateToken, async (req, res) => {
+    const { action, group_name } = req.body;
+    if (!action || !group_name) return res.status(400).json({ message: 'Ação e nome do grupo são obrigatórios' });
+
+    try {
+        const allDevices = await db.getDevices(req.user.id);
+        const targetDevices = allDevices.filter(d => d.group_name === group_name);
+
+        if (targetDevices.length === 0) {
+            return res.status(404).json({ message: 'Nenhum dispositivo encontrado neste grupo' });
+        }
+
+        // We respond immediately and process in background to avoid timeout
+        res.json({ message: `Executando ${action} em ${targetDevices.length} dispositivos do grupo ${group_name}` });
+
+        for (const device of targetDevices) {
+            // Internal logic for command (simplified for group)
+            if (action === 'wol') {
+                if (device.mac) wol.wake(device.mac, () => { });
+            } else {
+                // For shutdown/restart we'd ideally trigger the same logic as /api/command
+                // For brevity in group actions, we'll implement a simplified version or 
+                // we could trigger internal functions if refactored.
+                // Let's use a simplified call for now.
+                const flag = isWin ? (action === 'shutdown' ? '/s' : '/r') : (action === 'shutdown' ? '-s' : '-r');
+                const targetIp = device.ip;
+                const isLocal = targetIp === '127.0.0.1' || targetIp === 'localhost';
+                const credentials = (device.win_user && device.win_pass) ? { user: device.win_user, pass: device.win_pass } : null;
+
+                let cmd = '';
+                if (isLocal) {
+                    cmd = `shutdown ${flag} /f /t 10 /c "Group-Hub-Action"`;
+                } else if (isWin) {
+                    cmd = `shutdown /m \\\\${targetIp} ${flag} /f /t 10 /c "Group-Hub-Action"`;
+                } else if (credentials) {
+                    cmd = `net rpc shutdown -I ${targetIp} -U "${credentials.user}%${credentials.pass}" ${flag} -t 10 -C "Group-Hub-Action"`;
+                }
+
+                if (cmd) {
+                    if (isWin && !isLocal && credentials) {
+                        exec(`net use \\\\${targetIp} /user:${credentials.user} ${credentials.pass}`, () => exec(cmd));
+                    } else {
+                        exec(cmd);
+                    }
+                }
+            }
+        }
+
+        await db.addLog(req.user.id, `Executou ação de grupo: ${action} no grupo ${group_name}`);
+    } catch (error) {
+        console.error('Group command error:', error);
     }
 });
 

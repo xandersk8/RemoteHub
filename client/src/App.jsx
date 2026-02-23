@@ -9,7 +9,7 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [view, setView] = useState('dashboard'); // 'dashboard', 'add-device', 'timer'
+  const [view, setView] = useState('dashboard'); // 'dashboard', 'add-device', 'timer', 'logs', 'profile'
   const [devices, setDevices] = useState([]);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +20,10 @@ function App() {
   const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
 
   // New Device Form
-  const [newDevice, setNewDevice] = useState({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' });
+  const [newDevice, setNewDevice] = useState({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' });
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+  const [logs, setLogs] = useState([]);
+  const [previousStatuses, setPreviousStatuses] = useState({});
 
   useEffect(() => {
     if (token) {
@@ -45,7 +48,21 @@ function App() {
       const interval = setInterval(fetchTimers, 10000);
       return () => clearInterval(interval);
     }
+    if (isLoggedIn && view === 'logs') {
+      fetchLogs();
+      const interval = setInterval(fetchLogs, 20000);
+      return () => clearInterval(interval);
+    }
   }, [isLoggedIn, view]);
+
+  // Notifications Request
+  useEffect(() => {
+    if ("Notification" in window) {
+      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
 
   // Effect to clear status message after 5 seconds
   useEffect(() => {
@@ -57,6 +74,14 @@ function App() {
       return () => clearTimeout(timer);
     }
   }, [status, error]);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   const fetchDevices = async () => {
     try {
@@ -83,8 +108,23 @@ function App() {
       const statusMap = {};
       response.data.forEach(res => {
         statusMap[res.id] = res.isOnline;
+
+        // Check for changes to trigger notification
+        if (previousStatuses[res.id] !== undefined && previousStatuses[res.id] !== res.isOnline) {
+          const device = devices.find(d => d.id === res.id);
+          if (device) {
+            const statusText = res.isOnline ? 'ONLINE' : 'OFFLINE';
+            if (Notification.permission === "granted") {
+              new Notification(`Remote Hub: ${device.name}`, {
+                body: `O dispositivo está ${statusText} agora.`,
+                icon: '/icon.svg'
+              });
+            }
+          }
+        }
       });
 
+      setPreviousStatuses(statusMap);
       setDevices(prev => prev.map(d => ({
         ...d,
         isOnline: statusMap[d.id] ?? false
@@ -94,15 +134,44 @@ function App() {
     }
   };
 
+  const fetchLogs = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/logs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLogs(response.data);
+    } catch (err) {
+      console.error('Failed to fetch logs');
+    }
+  };
+
+  const handleClearLogs = async () => {
+    if (!confirm('Deseja limpar todo o histórico de atividades?')) return;
+    setLoading(true);
+    try {
+      await axios.delete(`${API_URL}/logs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setStatus('Histórico limpo com sucesso!');
+      setLogs([]);
+    } catch (err) {
+      setError('Erro ao limpar histórico');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
       const response = await axios.post(`${API_URL}/login`, { username, password });
-      const { token: receivedToken, username: loggedUsername } = response.data;
+      const { token: receivedToken, username: loggedUsername, theme: userTheme } = response.data;
       localStorage.setItem('token', receivedToken);
+      localStorage.setItem('theme', userTheme || 'dark');
       setToken(receivedToken);
+      setTheme(userTheme || 'dark');
       setUsername(loggedUsername);
       setIsLoggedIn(true);
     } catch (err) {
@@ -136,7 +205,7 @@ function App() {
       }
       fetchDevices();
       setView('dashboard');
-      setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' });
+      setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' });
       setEditingDeviceId(null);
     } catch (err) {
       setError('Erro ao salvar dispositivo');
@@ -152,6 +221,7 @@ function App() {
       ip: device.ip,
       mac: device.mac,
       type: device.type,
+      group_name: device.group_name || 'Geral',
       win_user: device.win_user || '',
       win_pass: device.win_pass || ''
     });
@@ -261,6 +331,43 @@ function App() {
     }
   };
 
+  const handleToggleTheme = async () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    if (token) {
+      try {
+        await axios.put(`${API_URL}/profile/theme`, { theme: newTheme }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (err) {
+        console.error('Failed to update theme on server');
+      }
+    }
+  };
+
+  const handleGroupAction = async (groupName, action) => {
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/command/group`,
+        { action, group_name: groupName },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setStatus(response.data.message);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro na ação de grupo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const groupedDevices = devices.reduce((acc, device) => {
+    const group = (device.group_name && device.group_name.trim() !== '') ? device.group_name : 'Geral';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(device);
+    return acc;
+  }, {});
+
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background-light dark:bg-background-dark flex flex-col items-center justify-center p-6">
@@ -315,76 +422,114 @@ function App() {
         {view === 'dashboard' ? (
           <>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Online</p>
                 <p className="text-2xl font-bold">{devices.filter(d => d.isOnline).length} <span className="text-sm font-normal text-slate-500">Nodes</span></p>
               </div>
-              <div className="bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Total</p>
                 <p className="text-2xl font-bold">{devices.length} <span className="text-sm font-normal text-slate-500">Dispositivos</span></p>
               </div>
             </div>
 
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest px-1">Seus Dispositivos</h3>
+            <div className="flex items-center justify-between mb-4 mt-6">
+              <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-widest px-1">Seus Dispositivos</h3>
+              <button
+                onClick={() => { setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' }); setView('add-device'); }}
+                className="px-3 py-1.5 bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-primary hover:text-white transition-all"
+              >
+                + Adicionar
+              </button>
+            </div>
 
             <AnimatePresence>
-              {devices.map((device) => (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  key={device.id}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm premium-card"
-                >
-                  <div className="p-4 flex items-start justify-between">
-                    <div className="flex gap-4">
-                      <div className={`size-12 rounded-lg ${device.isOnline ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'} flex items-center justify-center`}>
-                        <span className="material-symbols-outlined text-3xl">
-                          {device.type === 'server' ? 'dns' : device.type === 'laptop' ? 'laptop_mac' : 'desktop_windows'}
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-lg">{device.name}</h4>
-                        <div className="flex items-center gap-1.5">
-                          <span className="relative flex h-2 w-2">
-                            {device.isOnline && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
-                            <span className={`relative inline-flex rounded-full h-2 w-2 ${device.isOnline ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`}></span>
-                          </span>
-                          <span className={`text-sm font-medium tracking-tight ${device.isOnline ? 'text-green-500' : 'text-slate-400'}`}>
-                            {device.isOnline ? 'Ativo' : 'Offline'}
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">{device.ip}</span>
-                        </div>
-                      </div>
-                    </div>
+              {Object.entries(groupedDevices).map(([groupName, groupDevices]) => (
+                <div key={groupName} className="space-y-4 mb-8">
+                  <div className="flex items-center justify-between px-1">
+                    <h4 className="text-xs font-black uppercase tracking-tighter text-slate-400 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm">folder_open</span>
+                      {groupName}
+                    </h4>
                     <div className="flex gap-2">
-                      <button onClick={() => handleEditDevice(device)} className="text-slate-400 hover:text-primary transition-colors p-2">
-                        <span className="material-symbols-outlined">edit</span>
+                      <button
+                        onClick={() => handleGroupAction(groupName, 'wol')}
+                        className="px-2 py-1 bg-green-500/10 text-green-500 text-[9px] font-black uppercase tracking-widest rounded-md hover:bg-green-500 hover:text-white transition-colors"
+                      >
+                        Ligar Todos
                       </button>
-                      <button onClick={() => handleDeleteDevice(device.id)} className="text-slate-400 hover:text-red-500 transition-colors p-2">
-                        <span className="material-symbols-outlined">delete</span>
+                      <button
+                        onClick={() => handleGroupAction(groupName, 'shutdown')}
+                        className="px-2 py-1 bg-red-500/10 text-red-500 text-[9px] font-black uppercase tracking-widest rounded-md hover:bg-red-500 hover:text-white transition-colors"
+                      >
+                        Desligar Todos
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 p-4 pt-0">
-                    <button
-                      onClick={() => sendWol(device.mac)}
-                      className={`flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all text-sm font-semibold shadow-lg ${device.isOnline ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary/90 shadow-primary/20'
-                        }`}
-                      disabled={loading || device.isOnline}
-                    >
-                      <span className="material-symbols-outlined text-sm">bolt</span> Power On
-                    </button>
-                    <button
-                      onClick={() => sendCommand('shutdown', device.ip, device.id)}
-                      className={`flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all text-sm font-semibold border ${!device.isOnline ? 'bg-slate-50 dark:bg-slate-950/50 text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-red-500/20'
-                        }`}
-                      disabled={loading || !device.isOnline}
-                    >
-                      <span className="material-symbols-outlined text-sm">power_settings_new</span> Shutdown
-                    </button>
+
+                  <div className="space-y-3">
+                    {groupDevices.map((device) => (
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        key={device.id}
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm premium-card"
+                      >
+                        <div className="p-4 flex items-start justify-between">
+                          <div className="flex gap-4">
+                            <div className={`size-12 rounded-xl ${device.isOnline ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'} flex items-center justify-center transition-colors shadow-inner`}>
+                              <span className="material-symbols-outlined text-3xl">
+                                {device.type === 'server' ? 'dns' : device.type === 'laptop' ? 'laptop_mac' : 'desktop_windows'}
+                              </span>
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-lg leading-tight tracking-tight">{device.name}</h4>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="relative flex h-2 w-2">
+                                  {device.isOnline && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
+                                  <span className={`relative inline-flex rounded-full h-2 w-2 ${device.isOnline ? 'bg-green-500' : 'bg-slate-300 dark:bg-slate-700'}`}></span>
+                                </span>
+                                <span className={`text-xs font-bold tracking-tight ${device.isOnline ? 'text-green-500' : 'text-slate-400'}`}>
+                                  {device.isOnline ? 'ATIVO' : 'OFFLINE'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 uppercase tracking-widest ml-2 font-medium">{device.ip}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button onClick={() => handleEditDevice(device)} className="size-9 rounded-lg border border-slate-100 dark:border-slate-800 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center">
+                              <span className="material-symbols-outlined text-xl">settings</span>
+                            </button>
+                            {!device.isOnline && device.mac && (
+                              <button onClick={() => sendWol(device.mac)} className="size-9 rounded-lg bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white transition-all flex items-center justify-center shadow-lg shadow-green-500/5">
+                                <span className="material-symbols-outlined text-xl">bolt</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+                          <button
+                            onClick={() => sendCommand('restart', device.ip, device.id)}
+                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-slate-50 dark:bg-slate-950/50 text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary hover:text-white border-slate-200 dark:border-slate-700 hover:border-primary'}`}
+                            disabled={loading || !device.isOnline}
+                          >
+                            <span className="material-symbols-outlined text-sm">refresh</span> Reiniciar
+                          </button>
+                          <button
+                            onClick={() => sendCommand('shutdown', device.ip, device.id)}
+                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-slate-50 dark:bg-slate-950/50 text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-red-500/20'}`}
+                            disabled={loading || !device.isOnline}
+                          >
+                            <span className="material-symbols-outlined text-sm">power_settings_new</span> Desligar
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
-                </motion.div>
+                </div>
               ))}
             </AnimatePresence>
 
@@ -471,6 +616,42 @@ function App() {
               )}
             </div>
           </motion.div>
+        ) : view === 'logs' ? (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-black tracking-tight">Histórico de Atividades</h2>
+              {logs.length > 0 && (
+                <button
+                  onClick={handleClearLogs}
+                  className="px-3 py-1.5 bg-red-500/10 text-red-500 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-red-500 hover:text-white transition-all flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-xs">delete_sweep</span> Limpar
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {logs.length === 0 ? (
+                <div className="py-20 text-center">
+                  <p className="text-slate-500">Sem atividades registradas.</p>
+                </div>
+              ) : (
+                logs.map(log => (
+                  <div key={log.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-start gap-4">
+                    <div className="size-10 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-slate-400 text-lg">history</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium leading-relaxed">{log.message}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                        {new Date(log.timestamp).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
         ) : view === 'profile' ? (
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
             <h2 className="text-2xl font-black mb-6 tracking-tight">Seu Perfil</h2>
@@ -481,6 +662,26 @@ function App() {
               </div>
               <h3 className="text-xl font-bold">{username}</h3>
               <p className="text-slate-500 text-sm">Administrador do Sistema</p>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-8 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-4">
+                <span className="material-symbols-outlined text-slate-400 text-2xl">
+                  {theme === 'dark' ? 'dark_mode' : 'light_mode'}
+                </span>
+                <div>
+                  <h4 className="font-bold">Tema do Sistema</h4>
+                  <p className="text-xs text-slate-500">Modo {theme === 'dark' ? 'Escuro' : 'Claro'} ativo</p>
+                </div>
+              </div>
+              <button
+                onClick={handleToggleTheme}
+                className={`w-14 h-8 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-primary' : 'bg-slate-300'}`}
+              >
+                <div
+                  className={`absolute top-1 size-6 bg-white rounded-full shadow-sm transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}
+                />
+              </button>
             </div>
 
             <form onSubmit={handleChangePassword} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
@@ -527,7 +728,10 @@ function App() {
         ) : (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <header className="flex items-center gap-4 mb-8">
-              <button onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' }); }} className="size-10 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
+              <button
+                onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' }); }}
+                className="size-10 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
+              >
                 <span className="material-symbols-outlined text-primary">arrow_back_ios_new</span>
               </button>
               <h2 className="text-2xl font-extrabold tracking-tight">{editingDeviceId ? 'Editar Dispositivo' : 'Adicionar Dispositivo'}</h2>
@@ -537,23 +741,30 @@ function App() {
               <section className="space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="material-symbols-outlined text-primary text-sm">info</span>
-                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Identidade</h2>
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Identidade & Grupo</h2>
                 </div>
                 <div className="space-y-4">
                   <div className="group">
                     <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Apelido da Máquina</label>
                     <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="ex: PC do Quarto" type="text" value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} required />
                   </div>
-                  <div className="group">
-                    <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Tipo de Dispositivo</label>
-                    <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-                      {['desktop', 'laptop', 'server'].map(t => (
-                        <label key={t} className={`relative flex flex-col items-center justify-center py-3 rounded-lg cursor-pointer transition-all ${newDevice.type === t ? 'bg-primary text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:bg-white/5'}`}>
-                          <input className="hidden" name="device_type" type="radio" value={t} checked={newDevice.type === t} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })} />
-                          <span className="material-symbols-outlined mb-1">{t === 'desktop' ? 'desktop_windows' : t === 'laptop' ? 'laptop_mac' : 'dns'}</span>
-                          <span className="text-[10px] font-bold uppercase">{t}</span>
-                        </label>
-                      ))}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="group">
+                      <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">category</span> Categoria
+                      </label>
+                      <select className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })}>
+                        <option value="desktop">PC Desktop</option>
+                        <option value="laptop">Laptop</option>
+                        <option value="server">Servidor / Hub</option>
+                      </select>
+                    </div>
+                    <div className="group">
+                      <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">folder</span> Grupo
+                      </label>
+                      <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ex: Sala" type="text" value={newDevice.group_name} onChange={e => setNewDevice({ ...newDevice, group_name: e.target.value })} required />
                     </div>
                   </div>
                 </div>
@@ -600,7 +811,7 @@ function App() {
                       <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="••••••••" type="password" value={newDevice.win_pass} onChange={e => setNewDevice({ ...newDevice, win_pass: e.target.value })} />
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 px-1 italic">* Necessário para comandos de desligamento/reinicio remoto se o PC exigir login prévio.</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 px-1 italic">* Necessário para comandos remotos se o PC exigir login prévio.</p>
                 </div>
               </section>
 
@@ -609,7 +820,7 @@ function App() {
                   <span className="material-symbols-outlined">save</span>
                   {loading ? 'Salvando...' : editingDeviceId ? 'Atualizar Dispositivo' : 'Salvar Dispositivo'}
                 </button>
-                <button type="button" onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', win_user: '', win_pass: '' }); }} className="w-full py-4 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 transition-colors">Cancelar</button>
+                <button type="button" onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' }); }} className="w-full py-4 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 transition-colors">Cancelar</button>
               </div>
             </form>
           </motion.div>
@@ -634,7 +845,7 @@ function App() {
           >
             <span className="material-symbols-outlined text-primary">check_circle</span>
             <span className="font-bold flex-1">{status}</span>
-            <button onClick={() => setStatus('')} className="p-1 hover:bg-white/10 rounded-full"><span className="material-symbols-outlined text-xs">close</span></button>
+            <button onClick={() => setStatus('')} className="p-1 hover:bg-white/10 rounded-full transition-colors"><span className="material-symbols-outlined text-xs">close</span></button>
           </motion.div>
         )}
         {error && (
@@ -647,28 +858,28 @@ function App() {
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-white">error</span>
               <span className="font-bold flex-1">{error}</span>
-              <button onClick={() => setError('')} className="p-1 hover:bg-white/10 rounded-full"><span className="material-symbols-outlined text-xs">close</span></button>
+              <button onClick={() => setError('')} className="p-1 hover:bg-white/10 rounded-full transition-colors"><span className="material-symbols-outlined text-xs">close</span></button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 px-6 pb-8 pt-3 z-40 ios-blur">
+      <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 px-6 pb-8 pt-3 z-40 ios-blur shadow-[0_-4px_20px_0_rgba(0,0,0,0.05)]">
         <div className="flex justify-between items-center max-w-md mx-auto">
-          <button onClick={() => setView('dashboard')} className={`flex flex-col items-center gap-1 ${view === 'dashboard' ? 'text-primary' : 'text-slate-400'}`}>
+          <button onClick={() => setView('dashboard')} className={`flex flex-col items-center gap-1 transition-all ${view === 'dashboard' ? 'text-primary' : 'text-slate-400'}`}>
             <span className={`material-symbols-outlined ${view === 'dashboard' ? 'fill-icon' : ''}`}>dashboard</span>
             <span className="text-[10px] font-bold uppercase tracking-tighter">Nodes</span>
           </button>
-          <button className="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 opacity-50">
-            <span className="material-symbols-outlined">analytics</span>
-            <span className="text-[10px] font-bold uppercase tracking-tighter">Logs</span>
+          <button onClick={() => setView('logs')} className={`flex flex-col items-center gap-1 transition-all ${view === 'logs' ? 'text-primary' : 'text-slate-400'}`}>
+            <span className={`material-symbols-outlined ${view === 'logs' ? 'fill-icon' : ''}`}>history</span>
+            <span className="text-[10px] font-bold uppercase tracking-tighter">Histórico</span>
           </button>
-          <button onClick={() => setView('timer')} className={`flex flex-col items-center gap-1 ${view === 'timer' ? 'text-primary' : 'text-slate-400'}`}>
+          <button onClick={() => setView('timer')} className={`flex flex-col items-center gap-1 transition-all ${view === 'timer' ? 'text-primary' : 'text-slate-400'}`}>
             <span className={`material-symbols-outlined ${view === 'timer' ? 'fill-icon' : ''}`}>schedule</span>
             <span className="text-[10px] font-bold uppercase tracking-tighter">Timer</span>
           </button>
-          <button onClick={() => setView('profile')} className={`flex flex-col items-center gap-1 ${view === 'profile' ? 'text-primary' : 'text-slate-400'}`}>
+          <button onClick={() => setView('profile')} className={`flex flex-col items-center gap-1 transition-all ${view === 'profile' ? 'text-primary' : 'text-slate-400'}`}>
             <span className={`material-symbols-outlined ${view === 'profile' ? 'fill-icon' : ''}`}>person</span>
             <span className="text-[10px] font-bold uppercase tracking-tighter">Perfil</span>
           </button>

@@ -8,6 +8,12 @@
   --radius-default: 0.25rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
+
+  --variant-dark: .dark &;
+}
+
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.1s ease;
 }
 
 :root {

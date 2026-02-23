@@ -10,7 +10,8 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
-        password TEXT
+        password TEXT,
+        theme TEXT DEFAULT 'dark'
     )`);
 
     // Create devices table
@@ -21,14 +22,26 @@ db.serialize(() => {
         ip TEXT,
         mac TEXT,
         type TEXT DEFAULT 'desktop',
+        group_name TEXT DEFAULT 'Geral',
         win_user TEXT,
         win_pass TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )`);
+
+    // Create logs table
+    db.run(`CREATE TABLE IF NOT EXISTS logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        message TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
 
     // Ensure columns exist if table was already created
     db.run("ALTER TABLE devices ADD COLUMN win_user TEXT", (err) => { });
     db.run("ALTER TABLE devices ADD COLUMN win_pass TEXT", (err) => { });
+    db.run("ALTER TABLE devices ADD COLUMN group_name TEXT DEFAULT 'Geral'", (err) => { });
+    db.run("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'dark'", (err) => { });
 
     // Add default admin user if it doesn't exist
     const defaultUser = 'admin';
@@ -38,14 +51,10 @@ db.serialize(() => {
         if (err) {
             console.error(err.message);
         } else {
-            const hash = bcrypt.hashSync(defaultPass, 10);
             if (!row) {
+                const hash = bcrypt.hashSync(defaultPass, 10);
                 db.run("INSERT INTO users (username, password) VALUES (?, ?)", [defaultUser, hash]);
                 console.log("Default admin user created.");
-            } else {
-                // Force reset admin password to 'admin123' to ensure user can log in
-                db.run("UPDATE users SET password = ? WHERE username = ?", [hash, defaultUser]);
-                console.log("Admin password force-reset to admin123.");
             }
         }
     });
@@ -77,19 +86,43 @@ module.exports = {
             });
         });
     },
-    addDevice: (userId, name, ip, mac, type, win_user, win_pass) => {
+    addLog: (userId, message) => {
         return new Promise((resolve, reject) => {
-            db.run("INSERT INTO devices (user_id, name, ip, mac, type, win_user, win_pass) VALUES (?, ?, ?, ?, ?, ?, ?)", [userId, name, ip, mac, type, win_user, win_pass], function (err) {
+            db.run("INSERT INTO logs (user_id, message) VALUES (?, ?)", [userId, message], function (err) {
                 if (err) reject(err);
                 else resolve({ id: this.lastID });
             });
         });
     },
-    updateDevice: (id, userId, name, ip, mac, type, win_user, win_pass) => {
+    getLogs: (userId) => {
+        return new Promise((resolve, reject) => {
+            db.all("SELECT * FROM logs WHERE user_id = ? ORDER BY timestamp DESC LIMIT 100", [userId], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
+        });
+    },
+    clearLogs: (userId) => {
+        return new Promise((resolve, reject) => {
+            db.run("DELETE FROM logs WHERE user_id = ?", [userId], function (err) {
+                if (err) reject(err);
+                else resolve({ changes: this.changes });
+            });
+        });
+    },
+    addDevice: (userId, name, ip, mac, type, group_name, win_user, win_pass) => {
+        return new Promise((resolve, reject) => {
+            db.run("INSERT INTO devices (user_id, name, ip, mac, type, group_name, win_user, win_pass) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [userId, name, ip, mac, type, group_name || 'Geral', win_user, win_pass], function (err) {
+                if (err) reject(err);
+                else resolve({ id: this.lastID });
+            });
+        });
+    },
+    updateDevice: (id, userId, name, ip, mac, type, group_name, win_user, win_pass) => {
         return new Promise((resolve, reject) => {
             db.run(
-                "UPDATE devices SET name = ?, ip = ?, mac = ?, type = ?, win_user = ?, win_pass = ? WHERE id = ? AND user_id = ?",
-                [name, ip, mac, type, win_user, win_pass, id, userId],
+                "UPDATE devices SET name = ?, ip = ?, mac = ?, type = ?, group_name = ?, win_user = ?, win_pass = ? WHERE id = ? AND user_id = ?",
+                [name, ip, mac, type, group_name || 'Geral', win_user, win_pass, id, userId],
                 function (err) {
                     if (err) reject(err);
                     else resolve({ changes: this.changes });
@@ -109,6 +142,14 @@ module.exports = {
         return new Promise((resolve, reject) => {
             const hash = bcrypt.hashSync(newPassword, 10);
             db.run("UPDATE users SET password = ? WHERE id = ?", [hash, userId], function (err) {
+                if (err) reject(err);
+                else resolve({ changes: this.changes });
+            });
+        });
+    },
+    updateUserTheme: (userId, theme) => {
+        return new Promise((resolve, reject) => {
+            db.run("UPDATE users SET theme = ? WHERE id = ?", [theme, userId], function (err) {
                 if (err) reject(err);
                 else resolve({ changes: this.changes });
             });
