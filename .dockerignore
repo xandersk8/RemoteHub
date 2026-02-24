@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/build
+.git
+.gitignore
+server/users.db
+server/users.db-journal
+client/.venv
+*.log

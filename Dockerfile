@@ -2,11 +2,12 @@
 FROM node:20-bookworm AS build-stage
 WORKDIR /app
 
-# Install build dependencies for native modules
+# Install build dependencies
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY client/package*.json ./client/
 RUN cd client && npm install
+
 COPY client/ ./client/
 RUN cd client && npm run build
 
@@ -19,16 +20,20 @@ RUN apt-get update || (sleep 5 && apt-get update) && \
     apt-get install -y --no-install-recommends \
     samba-common-bin \
     iputils-ping \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
+# Install backend dependencies first (clean)
 COPY server/package*.json ./server/
-RUN cd server && npm install --production
+RUN cd server && npm install --production && npm rebuild sqlite3
+
+# Copy source code (will skip node_modules because of .dockerignore)
+COPY server/ ./server/
 
 # Copy built frontend from Stage 1
 COPY --from=build-stage /app/client/dist ./client/dist
-
-# Copy backend source
-COPY server/ ./server/
 
 EXPOSE 3080
 ENV NODE_ENV=production
