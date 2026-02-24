@@ -1,2 +1,82 @@
 2026-02-23 19:19:01 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
 2026-02-23 19:19:01 - Started 18120
+2026-02-23 22:02:47 - Stopping remotepccontroller.exe
+2026-02-23 22:02:47 - ProcessKill 18120
+2026-02-23 22:02:47 - Shutdown exception
+Message:O sistema está sendo desligado.
+
+Stacktrace:   em System.Runtime.InteropServices.Marshal.ThrowExceptionForHRInternal(Int32 errorCode, IntPtr errorInfo)
+   em System.Management.ManagementScope.InitializeGuts(Object o)
+   em System.Management.ManagementScope.Initialize()
+   em System.Management.ManagementObjectSearcher.Initialize()
+   em System.Management.ManagementObjectSearcher.Get()
+   em winsw.WrapperService.GetChildPids(Int32 pid)
+   em winsw.WrapperService.StopProcessAndChildren(Int32 pid)
+   em winsw.WrapperService.StopIt()
+   em winsw.WrapperService.OnShutdown()
+2026-02-23 22:06:32 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2026-02-23 22:06:32 - Started 6008
+2026-02-23 22:07:47 - Stopping remotepccontroller.exe
+2026-02-23 22:07:47 - ProcessKill 6008
+2026-02-23 22:07:47 - Shutdown exception
+Message:O sistema está sendo desligado.
+
+Stacktrace:   em System.Runtime.InteropServices.Marshal.ThrowExceptionForHRInternal(Int32 errorCode, IntPtr errorInfo)
+   em System.Management.ManagementScope.InitializeGuts(Object o)
+   em System.Management.ManagementScope.Initialize()
+   em System.Management.ManagementObjectSearcher.Initialize()
+   em System.Management.ManagementObjectSearcher.Get()
+   em winsw.WrapperService.GetChildPids(Int32 pid)
+   em winsw.WrapperService.StopProcessAndChildren(Int32 pid)
+   em winsw.WrapperService.StopIt()
+   em winsw.WrapperService.OnShutdown()
+2026-02-24 06:40:11 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2026-02-24 06:40:12 - Started 6648
+2026-02-24 06:43:24 - Stopping remotepccontroller.exe
+2026-02-24 06:43:24 - ProcessKill 6648
+2026-02-24 06:43:24 - Shutdown exception
+Message:O sistema está sendo desligado.
+
+Stacktrace:   em System.Runtime.InteropServices.Marshal.ThrowExceptionForHRInternal(Int32 errorCode, IntPtr errorInfo)
+   em System.Management.ManagementScope.InitializeGuts(Object o)
+   em System.Management.ManagementScope.Initialize()
+   em System.Management.ManagementObjectSearcher.Initialize()
+   em System.Management.ManagementObjectSearcher.Get()
+   em winsw.WrapperService.GetChildPids(Int32 pid)
+   em winsw.WrapperService.StopProcessAndChildren(Int32 pid)
+   em winsw.WrapperService.StopIt()
+   em winsw.WrapperService.OnShutdown()
+2026-02-24 06:59:50 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2026-02-24 06:59:50 - Started 6628
+2026-02-24 07:01:05 - Stopping remotepccontroller.exe
+2026-02-24 07:01:05 - ProcessKill 6628
+2026-02-24 07:01:05 - Shutdown exception
+Message:O sistema está sendo desligado.
+
+Stacktrace:   em System.Runtime.InteropServices.Marshal.ThrowExceptionForHRInternal(Int32 errorCode, IntPtr errorInfo)
+   em System.Management.ManagementScope.InitializeGuts(Object o)
+   em System.Management.ManagementScope.Initialize()
+   em System.Management.ManagementObjectSearcher.Initialize()
+   em System.Management.ManagementObjectSearcher.Get()
+   em winsw.WrapperService.GetChildPids(Int32 pid)
+   em winsw.WrapperService.StopProcessAndChildren(Int32 pid)
+   em winsw.WrapperService.StopIt()
+   em winsw.WrapperService.OnShutdown()
+2026-02-24 08:43:33 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2026-02-24 08:43:34 - Started 6036
+2026-02-24 11:57:34 - Stopping remotepccontroller.exe
+2026-02-24 11:57:34 - ProcessKill 6036
+2026-02-24 11:57:34 - Shutdown exception
+Message:O sistema está sendo desligado.
+
+Stacktrace:   em System.Runtime.InteropServices.Marshal.ThrowExceptionForHRInternal(Int32 errorCode, IntPtr errorInfo)
+   em System.Management.ManagementScope.InitializeGuts(Object o)
+   em System.Management.ManagementScope.Initialize()
+   em System.Management.ManagementObjectSearcher.Initialize()
+   em System.Management.ManagementObjectSearcher.Get()
+   em winsw.WrapperService.GetChildPids(Int32 pid)
+   em winsw.WrapperService.StopProcessAndChildren(Int32 pid)
+   em winsw.WrapperService.StopIt()
+   em winsw.WrapperService.OnShutdown()
+2026-02-24 13:01:30 - Starting C:\Program Files\nodejs\node.exe  --harmony F:\APP\ShutdownPC\server\node_modules\node-windows\lib\wrapper.js --file F:\APP\ShutdownPC\server\server.js --scriptoptions= --log "Remote PC Controller wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2026-02-24 13:01:31 - Started 7444

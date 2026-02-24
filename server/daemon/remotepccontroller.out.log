@@ -1,3 +1,33 @@
 [dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
 Server running on port 3080
 To access from phone, use http://[IP_ADDRESS]:3080
+Executing command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /r /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /r /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /r /f /t 10 /c "RemotePC-Controller"
+Executing command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "RemotePC-Controller"
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+Server running on port 3080
+To access from phone, use http://[IP_ADDRESS]:3080
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+Server running on port 3080
+To access from phone, use http://[IP_ADDRESS]:3080
+[Timer] User ID: 1, Seeking Device ID: 2 (number)
+[Timer] Available Devices: [ '2 (number)', '3 (number)', '4 (number)' ]
+Executing scheduled shutdown for Master (192.168.1.100)
+Executing scheduled command: shutdown /m \\192.168.1.100 /s /f /t 10 /c "Scheduled-Remote-Hub"
+Scheduled command successful for 192.168.1.100
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+Server running on port 3080
+To access from phone, use http://[IP_ADDRESS]:3080
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+Server running on port 3080
+To access from phone, use http://[IP_ADDRESS]:3080
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+Server running on port 3080
+To access from phone, use http://[IP_ADDRESS]:3080

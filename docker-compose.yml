@@ -6,7 +6,14 @@ services:
     ports:
       - "3080:3080"
     volumes:
+      # Persistir banco de dados (fundamental para logs, grupos e senhas)
       - ./server/users.db:/app/server/users.db
     environment:
-      - JWT_SECRET=supersecretkey-remote-pc
+      - JWT_SECRET=${JWT_SECRET:-remotepc-secret-key-2024}
       - PORT=3080
+      - NODE_ENV=production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
