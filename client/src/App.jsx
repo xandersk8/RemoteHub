@@ -249,15 +249,23 @@ function App() {
   };
 
   const handleDeleteDevice = async (id) => {
-    if (!confirm('Deseja excluir este dispositivo?')) return;
+    if (!id) return;
+    if (!confirm('Tem certeza que deseja excluir este dispositivo?')) return;
+
+    setLoading(true);
     try {
       await axios.delete(`${API_URL}/devices/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setStatus('Dispositivo excluído com sucesso!');
       fetchDevices();
-      setStatus('Dispositivo removido');
+      setView('dashboard');
+      setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' });
+      setEditingDeviceId(null);
     } catch (err) {
       setError('Erro ao excluir dispositivo');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -428,13 +436,21 @@ function App() {
         {view === 'dashboard' ? (
           <>
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Online</p>
-                <p className="text-2xl font-bold">{devices.filter(d => d.isOnline).length} <span className="text-sm font-normal text-slate-500">Nodes</span></p>
+              <div className="bg-app-card p-5 rounded-[2rem] border border-app-border shadow-xl shadow-primary/5 flex flex-col justify-between h-32 relative overflow-hidden group">
+                <div className="absolute -right-6 -top-6 size-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+                <div className="flex items-center justify-between">
+                  <p className="text-app-muted text-[10px] font-black uppercase tracking-widest opacity-80">Online</p>
+                  <span className="material-symbols-outlined text-primary text-xl fill-icon">sensors</span>
+                </div>
+                <p className="text-4xl font-black tracking-tighter">{devices.filter(d => d.isOnline).length} <span className="text-sm font-bold text-app-muted opacity-60 tracking-normal ml-1">Ativos</span></p>
               </div>
-              <div className="bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Total</p>
-                <p className="text-2xl font-bold">{devices.length} <span className="text-sm font-normal text-slate-500">Dispositivos</span></p>
+              <div className="bg-app-card p-5 rounded-[2rem] border border-app-border shadow-xl shadow-primary/5 flex flex-col justify-between h-32 relative overflow-hidden group">
+                <div className="absolute -right-6 -top-6 size-24 bg-slate-500/5 rounded-full blur-2xl group-hover:bg-slate-500/10 transition-colors"></div>
+                <div className="flex items-center justify-between">
+                  <p className="text-app-muted text-[10px] font-black uppercase tracking-widest opacity-80">Total</p>
+                  <span className="material-symbols-outlined text-app-muted text-xl">devices</span>
+                </div>
+                <p className="text-4xl font-black tracking-tighter">{devices.length} <span className="text-sm font-bold text-app-muted opacity-60 tracking-normal ml-1">Nós</span></p>
               </div>
             </div>
 
@@ -772,24 +788,35 @@ function App() {
                     <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="ex: PC do Quarto" type="text" value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} required />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="group">
-                      <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">category</span> Categoria
-                      </label>
-                      <select className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })}>
-                        <option value="desktop">PC Windows</option>
-                        <option value="laptop">Laptop Windows</option>
-                        <option value="linux">Linux / Unraid (SSH)</option>
-                        <option value="server">Servidor Genérico</option>
-                      </select>
+                  <div className="group px-1">
+                    <label className="block text-sm font-bold uppercase tracking-widest text-app-muted opacity-70 mb-3 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm">category</span> Categoria do Dispositivo
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { id: 'desktop', name: 'PC Windows', icon: 'desktop_windows' },
+                        { id: 'laptop', name: 'Laptop', icon: 'laptop_mac' },
+                        { id: 'linux', name: 'Unraid / Linux', icon: 'terminal' },
+                        { id: 'server', name: 'Servidor', icon: 'dns' }
+                      ].map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setNewDevice({ ...newDevice, type: cat.id })}
+                          className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all ${newDevice.type === cat.id ? 'border-primary bg-primary/5 text-primary shadow-lg shadow-primary/5' : 'border-app-border bg-app-card text-app-muted hover:border-app-muted opacity-60'}`}
+                        >
+                          <span className="material-symbols-outlined text-2xl">{cat.icon}</span>
+                          <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-tight">{cat.name}</span>
+                        </button>
+                      ))}
                     </div>
-                    <div className="group">
-                      <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">folder</span> Grupo
-                      </label>
-                      <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ex: Sala" type="text" value={newDevice.group_name} onChange={e => setNewDevice({ ...newDevice, group_name: e.target.value })} required />
-                    </div>
+                  </div>
+
+                  <div className="group">
+                    <label className="block text-sm font-medium mb-1.5 ml-1 text-app-text flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">folder</span> Grupo / Localização
+                    </label>
+                    <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ex: Sala de Estar" type="text" value={newDevice.group_name} onChange={e => setNewDevice({ ...newDevice, group_name: e.target.value })} required />
                   </div>
                 </div>
               </section>
@@ -839,12 +866,25 @@ function App() {
                 </div>
               </section>
 
-              <div className="pt-4 pb-12">
+              <div className="pt-4 pb-12 space-y-3">
                 <button type="submit" disabled={loading} className="w-full h-16 bg-primary text-white rounded-2xl font-black text-lg shadow-xl shadow-primary/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-widest">
                   <span className="material-symbols-outlined">save</span>
                   {loading ? 'Salvando...' : editingDeviceId ? 'Atualizar Dispositivo' : 'Salvar Dispositivo'}
                 </button>
-                <button type="button" onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' }); }} className="w-full py-4 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 transition-colors">Cancelar</button>
+
+                {editingDeviceId && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDevice(editingDeviceId)}
+                    disabled={loading}
+                    className="w-full h-14 border-2 border-red-500/20 text-red-500 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-500/5 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-xl">delete</span>
+                    Excluir Dispositivo
+                  </button>
+                )}
+
+                <button type="button" onClick={() => { setView('dashboard'); setEditingDeviceId(null); setNewDevice({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' }); }} className="w-full py-2 text-slate-500 dark:text-slate-400 font-bold hover:text-slate-900 dark:hover:text-white transition-colors">Cancelar</button>
               </div>
             </form>
           </motion.div>

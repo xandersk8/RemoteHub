@@ -204,6 +204,14 @@ const runSshCommand = (host, username, password, command) => {
 };
 
 // Command endpoints
+app.delete('/api/devices/:id', authenticateToken, (req, res) => {
+    const { id } = req.params;
+    db.run("DELETE FROM devices WHERE id = ?", [id], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: "Device deleted", changes: this.changes });
+    });
+});
+
 app.post('/api/command', authenticateToken, async (req, res) => {
     let { action, ip, deviceId } = req.body;
     if (deviceId) deviceId = parseInt(deviceId);
