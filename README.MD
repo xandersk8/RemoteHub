@@ -1,4 +1,4 @@
-# Remote Hub PC v3.0 (Material Design)
+# Remote WakeOnLan PC v3.0 (Material Design)
 
 Este projeto foi atualizado com o design Material Symbols e Tailwind CSS para proporcionar uma experiência ultra-moderna e fluida.
 
@@ -37,4 +37,4 @@ Se o comando de desligamento falhar ou der "Acesso Negado", siga estes 3 passos 
 3. **Serviço de Registro Remoto**:
    - No `services.msc`, procure por **Registro Remoto (Remote Registry)**, mude para **Automático** e clique em **Iniciar**.
 
-# Remote Hub
+# Remote WakeOnLan

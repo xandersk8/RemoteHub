@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #137fec;
-  --color-background-light: #f6f7f8;
-  --color-background-dark: #101922;
+  --color-primary: var(--app-primary);
+  --color-primary-hover: var(--app-primary-hover);
+  --color-app-bg: var(--app-bg);
+  --color-app-card: var(--app-card);
+  --color-app-text: var(--app-text);
+  --color-app-muted: var(--app-muted);
+  --color-app-border: var(--app-border);
+
   --font-display: "Space Grotesk", sans-serif;
   --radius-default: 0.25rem;
   --radius-lg: 0.5rem;
@@ -12,19 +17,48 @@
   --variant-dark: .dark &;
 }
 
-* {
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.1s ease;
+:root {
+  /* Light Theme (Default) */
+  --app-primary: #137fec;
+  --app-primary-hover: #0d6efd;
+  --app-bg: #f8fafc;
+  --app-card: #ffffff;
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+  --app-border: #e2e8f0;
 }
 
-:root {
-  --primary: #137fec;
-  --background-light: #f6f7f8;
-  --background-dark: #101922;
+.dark {
+  /* Dark Theme Overrides */
+  --app-primary: #137fec;
+  --app-primary-hover: #1e88e5;
+  --app-bg: #020617;
+  --app-card: #0f172a;
+  --app-text: #f8fafc;
+  --app-muted: #94a3b8;
+  --app-border: #1e293b;
+}
+
+.purple {
+  /* Purple & White Theme */
+  --app-primary: #7c3aed;
+  --app-primary-hover: #6d28d9;
+  --app-bg: #fafaff;
+  --app-card: #ffffff;
+  --app-text: #2e1065;
+  --app-muted: #6d28d9;
+  --app-border: #ddd6fe;
+}
+
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.15s ease, transform 0.2s ease;
 }
 
 body {
   font-family: 'Space Grotesk', sans-serif;
   min-height: max(884px, 100dvh);
+  background-color: var(--app-bg);
+  color: var(--app-text);
 }
 
 .material-symbols-outlined {

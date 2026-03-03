@@ -11,7 +11,7 @@ db.serialize(() => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
         password TEXT,
-        theme TEXT DEFAULT 'dark'
+        theme TEXT DEFAULT 'light'
     )`);
 
     // Create devices table
@@ -41,7 +41,7 @@ db.serialize(() => {
     db.run("ALTER TABLE devices ADD COLUMN win_user TEXT", (err) => { });
     db.run("ALTER TABLE devices ADD COLUMN win_pass TEXT", (err) => { });
     db.run("ALTER TABLE devices ADD COLUMN group_name TEXT DEFAULT 'Geral'", (err) => { });
-    db.run("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'dark'", (err) => { });
+    db.run("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'light'", (err) => { });
 
     // Add default admin user if it doesn't exist
     const defaultUser = 'admin';

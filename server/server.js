@@ -5,13 +5,14 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { exec } = require('child_process');
 const wol = require('node-wol');
+const { Client } = require('ssh2');
 const db = require('./database');
 require('dotenv').config();
 
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3080;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey-remote-pc';
 
 app.use(cors());
@@ -171,6 +172,37 @@ app.post('/api/devices/status', authenticateToken, async (req, res) => {
 
 const isWin = process.platform === "win32";
 
+// Helper for SSH commands (Linux/Unraid)
+const runSshCommand = (host, username, password, command) => {
+    return new Promise((resolve, reject) => {
+        const conn = new Client();
+        conn.on('ready', () => {
+            conn.exec(command, (err, stream) => {
+                if (err) {
+                    conn.end();
+                    return reject(err);
+                }
+                stream.on('close', (code, signal) => {
+                    conn.end();
+                    resolve({ code, signal });
+                }).on('data', (data) => {
+                    console.log('STDOUT: ' + data);
+                }).stderr.on('data', (data) => {
+                    console.log('STDERR: ' + data);
+                });
+            });
+        }).on('error', (err) => {
+            reject(err);
+        }).connect({
+            host: host,
+            port: 22,
+            username: username,
+            password: password,
+            readyTimeout: 10000
+        });
+    });
+};
+
 // Command endpoints
 app.post('/api/command', authenticateToken, async (req, res) => {
     let { action, ip, deviceId } = req.body;
@@ -179,14 +211,21 @@ app.post('/api/command', authenticateToken, async (req, res) => {
     const targetIp = ip || '127.0.0.1';
     const isLocal = targetIp === '127.0.0.1' || targetIp === 'localhost';
 
-    // Retrieve credentials if deviceId is provided
+    // Retrieve credentials and type if deviceId is provided
     let credentials = null;
+    let deviceType = 'desktop';
+    let deviceName = targetIp;
+
     if (deviceId) {
         try {
             const allDevices = await db.getDevices(req.user.id);
             const device = allDevices.find(d => d.id === deviceId);
-            if (device && device.win_user && device.win_pass) {
-                credentials = { user: device.win_user, pass: device.win_pass };
+            if (device) {
+                deviceName = device.name;
+                deviceType = device.type;
+                if (device.win_user && device.win_pass) {
+                    credentials = { user: device.win_user, pass: device.win_pass };
+                }
             }
         } catch (err) {
             console.error('Error fetching device for credentials:', err);
@@ -202,17 +241,38 @@ app.post('/api/command', authenticateToken, async (req, res) => {
     else return res.status(400).json({ message: 'Ação inválida' });
 
     if (isLocal) {
-        fullCommand = `shutdown ${flag} /f /t 10 /c "RemotePC-Controller"`;
+        fullCommand = isWin ? `shutdown ${flag} /f /t 10 /c "RemotePC-Controller"` : `shutdown ${flag} +1 "RemoteHub-Action"`;
     } else {
-        if (isWin) {
-            // Windows to Windows Command
-            fullCommand = action === 'abort' ? `shutdown /m \\\\${targetIp} /a` : `shutdown /m \\\\${targetIp} ${flag} /f /t 10 /c "RemotePC-Controller"`;
-        } else {
-            // Linux/Docker to Windows Command (using net rpc)
+        if (deviceType === 'linux' || deviceType === 'server') { // Assumption: 'server' might be Linux/Unraid too
+            // Linux/Unraid via SSH
             if (!credentials) {
-                return res.status(400).json({ message: 'Credenciais (User/Pass) são obrigatórias para controle por Linux/Docker' });
+                return res.status(400).json({ message: 'Credenciais (User/Pass) são obrigatórias para controle Linux/SSH' });
             }
-            fullCommand = `net rpc shutdown -I ${targetIp} -U "${credentials.user}%${credentials.pass}" ${flag} -t 10 -C "RemotePC-Controller"`;
+            const sshCmd = action === 'shutdown' ? 'poweroff' : 'reboot';
+            console.log(`Executing SSH command: ${sshCmd} on ${targetIp}`);
+
+            runSshCommand(targetIp, credentials.user, credentials.pass, sshCmd)
+                .then(() => {
+                    res.json({ message: `Comando SSH enviado com sucesso para ${targetIp}` });
+                    db.addLog(req.user.id, `Enviou ${action} (SSH) para ${deviceName || targetIp}`).catch(() => { });
+                })
+                .catch((err) => {
+                    console.error(`SSH Command failed: ${err.message}`);
+                    res.status(500).json({ message: `Falha na conexão SSH: ${err.message}` });
+                });
+            return; // Exit here as runSshCommand handles the response
+        } else {
+            // Windows target logic
+            if (isWin) {
+                // Windows to Windows Command
+                fullCommand = action === 'abort' ? `shutdown /m \\\\${targetIp} /a` : `shutdown /m \\\\${targetIp} ${flag} /f /t 10 /c "RemotePC-Controller"`;
+            } else {
+                // Linux/Docker to Windows Command (using net rpc)
+                if (!credentials) {
+                    return res.status(400).json({ message: 'Credenciais (User/Pass) são obrigatórias para controle por Linux/Docker' });
+                }
+                fullCommand = `net rpc shutdown -I ${targetIp} -U "${credentials.user}%${credentials.pass}" ${flag} -t 10 -C "RemotePC-Controller"`;
+            }
         }
     }
 
@@ -238,7 +298,7 @@ app.post('/api/command', authenticateToken, async (req, res) => {
     };
 
     // If on Windows and we have credentials, establish session first
-    if (isWin && !isLocal && credentials) {
+    if (isWin && !isLocal && (deviceType !== 'linux' && deviceType !== 'server') && credentials) {
         const authCmd = `net use \\\\${targetIp} /user:${credentials.user} ${credentials.pass}`;
         exec(authCmd, (authErr) => {
             if (authErr) console.log(`Auth attempt failed for ${targetIp}, trying command anyway...`);
@@ -375,6 +435,21 @@ app.post('/api/timer', authenticateToken, async (req, res) => {
         const credentials = (device.win_user && device.win_pass) ? { user: device.win_user, pass: device.win_pass } : null;
         const targetIp = device.ip;
         const isLocal = targetIp === '127.0.0.1' || targetIp === 'localhost';
+        const deviceType = device.type || 'desktop';
+
+        if (deviceType === 'linux' || deviceType === 'server') {
+            const sshCmd = action === 'shutdown' ? 'poweroff' : 'reboot';
+            if (credentials) {
+                console.log(`Executing scheduled SSH command: ${sshCmd} on ${targetIp}`);
+                runSshCommand(targetIp, credentials.user, credentials.pass, sshCmd)
+                    .then(() => console.log(`Scheduled SSH command successful for ${targetIp}`))
+                    .catch((err) => console.error(`Scheduled SSH Command failed: ${err.message}`));
+            } else {
+                console.error(`Scheduled SSH failed: No credentials for ${targetIp}`);
+            }
+            scheduledTasks.delete(deviceId);
+            return;
+        }
 
         let flag = '';
         if (action === 'shutdown') flag = isWin ? '/s' : '-s';
@@ -382,7 +457,7 @@ app.post('/api/timer', authenticateToken, async (req, res) => {
 
         let fullCommand = '';
         if (isLocal) {
-            fullCommand = `shutdown ${flag} /f /t 10 /c "Scheduled-Remote-Hub"`;
+            fullCommand = isWin ? `shutdown ${flag} /f /t 10 /c "Scheduled-Remote-Hub"` : `shutdown ${flag} +1 "Scheduled-Remote-Hub"`;
         } else {
             if (isWin) {
                 fullCommand = `shutdown /m \\\\${targetIp} ${flag} /f /t 10 /c "Scheduled-Remote-Hub"`;
@@ -399,7 +474,7 @@ app.post('/api/timer', authenticateToken, async (req, res) => {
             });
         };
 
-        if (isWin && !isLocal && credentials) {
+        if (isWin && !isLocal && (deviceType !== 'linux' && deviceType !== 'server') && credentials) {
             exec(`net use \\\\${targetIp} /user:${credentials.user} ${credentials.pass}`, () => runCmd());
         } else {
             runCmd();

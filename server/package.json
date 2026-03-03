@@ -21,6 +21,7 @@
     "node-wol": "^0.1.1",
     "ping": "^1.0.0",
     "promise-parallel-throttle": "^3.5.0",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "ssh2": "^1.17.0"
   }
 }

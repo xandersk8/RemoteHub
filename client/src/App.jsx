@@ -21,7 +21,7 @@ function App() {
 
   // New Device Form
   const [newDevice, setNewDevice] = useState({ name: '', ip: '', mac: '', type: 'desktop', group_name: 'Geral', win_user: '', win_pass: '' });
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [logs, setLogs] = useState([]);
   const [previousStatuses, setPreviousStatuses] = useState({});
 
@@ -76,10 +76,11 @@ function App() {
   }, [status, error]);
 
   useEffect(() => {
+    document.documentElement.classList.remove('dark', 'purple');
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    } else if (theme === 'purple') {
+      document.documentElement.classList.add('purple');
     }
   }, [theme]);
 
@@ -115,7 +116,7 @@ function App() {
           if (device) {
             const statusText = res.isOnline ? 'ONLINE' : 'OFFLINE';
             if (Notification.permission === "granted") {
-              new Notification(`Remote Hub: ${device.name}`, {
+              new Notification(`Remote WakeOnLan: ${device.name}`, {
                 body: `O dispositivo está ${statusText} agora.`,
                 icon: '/icon.svg'
               });
@@ -158,6 +159,25 @@ function App() {
       setError('Erro ao limpar histórico');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleTheme = async () => {
+    const themes = ['light', 'dark', 'purple'];
+    const currentIndex = themes.indexOf(theme);
+    const nextTheme = themes[(currentIndex + 1) % themes.length];
+
+    setTheme(nextTheme);
+    localStorage.setItem('theme', nextTheme);
+
+    if (token) {
+      try {
+        await axios.put(`${API_URL}/profile/theme`, { theme: nextTheme }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (err) {
+        console.error('Failed to update theme on server');
+      }
     }
   };
 
@@ -331,20 +351,6 @@ function App() {
     }
   };
 
-  const handleToggleTheme = async () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    if (token) {
-      try {
-        await axios.put(`${API_URL}/profile/theme`, { theme: newTheme }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } catch (err) {
-        console.error('Failed to update theme on server');
-      }
-    }
-  };
 
   const handleGroupAction = async (groupName, action) => {
     setLoading(true);
@@ -370,28 +376,28 @@ function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-background-light dark:bg-background-dark flex flex-col items-center justify-center p-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2.5rem] p-10 shadow-xl shadow-primary/5">
+      <div className="min-h-screen bg-app-bg flex flex-col items-center justify-center p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md bg-app-card border border-app-border rounded-[2.5rem] p-10 shadow-xl shadow-primary/5">
           <div className="flex justify-center mb-10">
             <div className="size-20 bg-primary/20 rounded-[1.5rem] flex items-center justify-center">
               <span className="material-symbols-outlined text-primary text-5xl">router</span>
             </div>
           </div>
-          <h1 className="text-3xl font-black text-center mb-2 tracking-tight">Remote Hub</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-center mb-10">Controle seus dispositivos remotamente</p>
+          <h1 className="text-3xl font-black text-center mb-2 tracking-tight">Remote WakeOnLan</h1>
+          <p className="text-app-muted text-center mb-10">Controle seus dispositivos remotamente</p>
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Usuário</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-app-muted ml-1">Usuário</label>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">person</span>
-                <input type="text" className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all text-slate-900 dark:text-white" placeholder="admin" value={username} onChange={(e) => setUsername(e.target.value)} required />
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-app-muted/60">person</span>
+                <input type="text" className="w-full h-14 bg-app-bg border border-app-border rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all text-app-text" placeholder="admin" value={username} onChange={(e) => setUsername(e.target.value)} required />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Senha</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-app-muted ml-1">Senha</label>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">lock</span>
-                <input type="password" className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all text-slate-900 dark:text-white" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-app-muted/60">lock</span>
+                <input type="password" className="w-full h-14 bg-app-bg border border-app-border rounded-2xl pl-12 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all text-app-text" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
             </div>
             <button disabled={loading} className="w-full h-14 bg-primary text-white rounded-2xl font-bold text-lg shadow-lg shadow-primary/25 active:scale-[0.98] transition-all">
@@ -405,13 +411,13 @@ function App() {
   }
 
   return (
-    <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
-      <header className="sticky top-0 z-20 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex items-center justify-between">
+    <div className="bg-app-bg text-app-text min-h-screen flex flex-col">
+      <header className="sticky top-0 z-20 bg-app-bg/80 backdrop-blur-md border-b border-app-border px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="bg-primary/20 p-2 rounded-lg">
             <span className="material-symbols-outlined text-primary text-2xl">router</span>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Remote Hub</h1>
+          <h1 className="text-xl font-bold tracking-tight">Remote WakeOnLan</h1>
         </div>
         <button onClick={handleLogout} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
           <span className="material-symbols-outlined">logout</span>
@@ -474,13 +480,13 @@ function App() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         key={device.id}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm premium-card"
+                        className="bg-app-card border border-app-border rounded-2xl overflow-hidden shadow-sm premium-card"
                       >
                         <div className="p-4 flex items-start justify-between">
                           <div className="flex gap-4">
                             <div className={`size-12 rounded-xl ${device.isOnline ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'} flex items-center justify-center transition-colors shadow-inner`}>
                               <span className="material-symbols-outlined text-3xl">
-                                {device.type === 'server' ? 'dns' : device.type === 'laptop' ? 'laptop_mac' : 'desktop_windows'}
+                                {device.type === 'server' ? 'dns' : device.type === 'laptop' ? 'laptop_mac' : device.type === 'linux' ? 'terminal' : 'desktop_windows'}
                               </span>
                             </div>
                             <div>
@@ -499,7 +505,7 @@ function App() {
                           </div>
 
                           <div className="flex gap-2">
-                            <button onClick={() => handleEditDevice(device)} className="size-9 rounded-lg border border-slate-100 dark:border-slate-800 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center">
+                            <button onClick={() => handleEditDevice(device)} className="size-9 rounded-lg border border-app-border text-app-muted hover:bg-app-card transition-all flex items-center justify-center">
                               <span className="material-symbols-outlined text-xl">settings</span>
                             </button>
                             {!device.isOnline && device.mac && (
@@ -513,14 +519,14 @@ function App() {
                         <div className="px-4 pb-4 grid grid-cols-2 gap-3">
                           <button
                             onClick={() => sendCommand('restart', device.ip, device.id)}
-                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-slate-50 dark:bg-slate-950/50 text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary hover:text-white border-slate-200 dark:border-slate-700 hover:border-primary'}`}
+                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-app-bg text-app-muted border-app-border cursor-not-allowed' : 'bg-app-bg text-app-text hover:bg-primary hover:text-white border-app-border hover:border-primary'}`}
                             disabled={loading || !device.isOnline}
                           >
                             <span className="material-symbols-outlined text-sm">refresh</span> Reiniciar
                           </button>
                           <button
                             onClick={() => sendCommand('shutdown', device.ip, device.id)}
-                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-slate-50 dark:bg-slate-950/50 text-slate-300 border-slate-200 dark:border-slate-800 cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-red-500/20'}`}
+                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-app-bg text-app-muted border-app-border cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-red-500/20'}`}
                             disabled={loading || !device.isOnline}
                           >
                             <span className="material-symbols-outlined text-sm">power_settings_new</span> Desligar
@@ -544,11 +550,11 @@ function App() {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
             <h2 className="text-2xl font-black mb-6 tracking-tight">Agendador (Timer)</h2>
 
-            <form onSubmit={handleSetTimer} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm mb-8">
+            <form onSubmit={handleSetTimer} className="bg-app-card border border-app-border rounded-2xl p-6 space-y-6 shadow-sm mb-8">
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Dispositivo</label>
                 <select
-                  className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                  className="w-full h-14 bg-app-bg border border-app-border rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
                   value={timerData.deviceId}
                   onChange={e => setTimerData({ ...timerData, deviceId: e.target.value })}
                   required
@@ -564,7 +570,7 @@ function App() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Ação</label>
                   <select
-                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                    className="w-full h-14 bg-app-bg border border-app-border rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
                     value={timerData.action}
                     onChange={e => setTimerData({ ...timerData, action: e.target.value })}
                   >
@@ -577,7 +583,7 @@ function App() {
                   <input
                     type="number"
                     min="1"
-                    className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                    className="w-full h-14 bg-app-bg border border-app-border rounded-xl px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
                     value={timerData.minutes}
                     onChange={e => setTimerData({ ...timerData, minutes: e.target.value })}
                     required
@@ -591,14 +597,14 @@ function App() {
             </form>
 
             <div className="space-y-4 pb-12">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Timers Ativos</h3>
+              <h3 className="text-app-muted font-bold uppercase tracking-widest text-[10px] ml-1">Timers Ativos</h3>
               {timers.length === 0 ? (
                 <div className="bg-slate-100 dark:bg-slate-950 p-8 rounded-2xl text-center border border-dashed border-slate-300 dark:border-slate-800">
                   <p className="text-slate-400 font-medium">Nenhum timer agendado</p>
                 </div>
               ) : (
                 timers.map(t => (
-                  <div key={t.deviceId} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-sm border-l-4 border-l-primary">
+                  <div key={t.deviceId} className="bg-app-card border border-app-border rounded-xl p-4 flex items-center justify-between shadow-sm border-l-4 border-l-primary">
                     <div>
                       <h4 className="font-bold">{t.name}</h4>
                       <p className="text-xs text-slate-500">
@@ -637,7 +643,7 @@ function App() {
                 </div>
               ) : (
                 logs.map(log => (
-                  <div key={log.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-start gap-4">
+                  <div key={log.id} className="bg-app-card border border-app-border rounded-2xl p-4 shadow-sm flex items-start gap-4">
                     <div className="size-10 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-slate-400 text-lg">history</span>
                     </div>
@@ -656,7 +662,7 @@ function App() {
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
             <h2 className="text-2xl font-black mb-6 tracking-tight">Seu Perfil</h2>
 
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm mb-8 flex flex-col items-center">
+            <div className="bg-app-card border border-app-border rounded-3xl p-8 shadow-sm mb-8 flex flex-col items-center">
               <div className="size-24 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <span className="material-symbols-outlined text-primary text-5xl">person</span>
               </div>
@@ -664,28 +670,45 @@ function App() {
               <p className="text-slate-500 text-sm">Administrador do Sistema</p>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-8 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-4">
-                <span className="material-symbols-outlined text-slate-400 text-2xl">
-                  {theme === 'dark' ? 'dark_mode' : 'light_mode'}
-                </span>
+            <div className="bg-app-card border border-app-border rounded-2xl p-6 mb-8 shadow-sm">
+              <div className="flex items-center gap-4 mb-6">
+                <span className="material-symbols-outlined text-app-muted text-2xl">palette</span>
                 <div>
-                  <h4 className="font-bold">Tema do Sistema</h4>
-                  <p className="text-xs text-slate-500">Modo {theme === 'dark' ? 'Escuro' : 'Claro'} ativo</p>
+                  <h4 className="font-bold">Tema do Aplicativo</h4>
+                  <p className="text-xs text-app-muted">Escolha sua aparência preferida</p>
                 </div>
               </div>
-              <button
-                onClick={handleToggleTheme}
-                className={`w-14 h-8 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-primary' : 'bg-slate-300'}`}
-              >
-                <div
-                  className={`absolute top-1 size-6 bg-white rounded-full shadow-sm transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}
-                />
-              </button>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: 'light', name: 'Claro', icon: 'light_mode', color: 'bg-slate-100 text-slate-600' },
+                  { id: 'dark', name: 'Escuro', icon: 'dark_mode', color: 'bg-slate-800 text-slate-200' },
+                  { id: 'purple', name: 'Roxo', icon: 'auto_awesome', color: 'bg-purple-100 text-purple-600' }
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={async () => {
+                      setTheme(t.id);
+                      localStorage.setItem('theme', t.id);
+                      if (token) {
+                        try {
+                          await axios.put(`${API_URL}/profile/theme`, { theme: t.id }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                          });
+                        } catch (err) { console.error(err); }
+                      }
+                    }}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${theme === t.id ? 'border-primary bg-primary/5' : 'border-transparent bg-app-bg'}`}
+                  >
+                    <span className={`material-symbols-outlined ${theme === t.id ? 'text-primary' : 'text-app-muted'}`}>{t.icon}</span>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${theme === t.id ? 'text-primary' : 'text-app-muted'}`}>{t.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <form onSubmit={handleChangePassword} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Alterar Senha</h3>
+            <form onSubmit={handleChangePassword} className="bg-app-card border border-app-border rounded-2xl p-6 space-y-6 shadow-sm">
+              <h3 className="text-app-muted font-bold uppercase tracking-widest text-[10px] ml-1">Alterar Senha</h3>
 
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -694,7 +717,7 @@ function App() {
                     <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">lock</span>
                     <input
                       type="password"
-                      className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-12 pr-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                      className="w-full h-14 bg-app-bg border border-app-border rounded-xl pl-12 pr-4 outline-none focus:ring-2 focus:ring-primary transition-all"
                       placeholder="Mínimo 6 caracteres"
                       value={passwordData.newPassword}
                       onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
@@ -710,7 +733,7 @@ function App() {
                     <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">verified_user</span>
                     <input
                       type="password"
-                      className="w-full h-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-12 pr-4 outline-none focus:ring-2 focus:ring-primary transition-all"
+                      className="w-full h-14 bg-app-bg border border-app-border rounded-xl pl-12 pr-4 outline-none focus:ring-2 focus:ring-primary transition-all"
                       placeholder="Repita a nova senha"
                       value={passwordData.confirmPassword}
                       onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
@@ -746,7 +769,7 @@ function App() {
                 <div className="space-y-4">
                   <div className="group">
                     <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Apelido da Máquina</label>
-                    <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="ex: PC do Quarto" type="text" value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} required />
+                    <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="ex: PC do Quarto" type="text" value={newDevice.name} onChange={e => setNewDevice({ ...newDevice, name: e.target.value })} required />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -754,17 +777,18 @@ function App() {
                       <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300 flex items-center gap-1">
                         <span className="material-symbols-outlined text-xs">category</span> Categoria
                       </label>
-                      <select className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })}>
-                        <option value="desktop">PC Desktop</option>
-                        <option value="laptop">Laptop</option>
-                        <option value="server">Servidor / Hub</option>
+                      <select className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" value={newDevice.type} onChange={e => setNewDevice({ ...newDevice, type: e.target.value })}>
+                        <option value="desktop">PC Windows</option>
+                        <option value="laptop">Laptop Windows</option>
+                        <option value="linux">Linux / Unraid (SSH)</option>
+                        <option value="server">Servidor Genérico</option>
                       </select>
                     </div>
                     <div className="group">
                       <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300 flex items-center gap-1">
                         <span className="material-symbols-outlined text-xs">folder</span> Grupo
                       </label>
-                      <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ex: Sala" type="text" value={newDevice.group_name} onChange={e => setNewDevice({ ...newDevice, group_name: e.target.value })} required />
+                      <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="ex: Sala" type="text" value={newDevice.group_name} onChange={e => setNewDevice({ ...newDevice, group_name: e.target.value })} required />
                     </div>
                   </div>
                 </div>
@@ -779,14 +803,14 @@ function App() {
                   <div className="group">
                     <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Endereço IP</label>
                     <div className="relative">
-                      <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base font-mono" placeholder="192.168.1.15" type="text" value={newDevice.ip} onChange={e => setNewDevice({ ...newDevice, ip: e.target.value })} required />
+                      <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base font-mono" placeholder="192.168.1.15" type="text" value={newDevice.ip} onChange={e => setNewDevice({ ...newDevice, ip: e.target.value })} required />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 dark:text-slate-600 text-xl">settings_ethernet</span>
                     </div>
                   </div>
                   <div className="group">
                     <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Endereço MAC</label>
                     <div className="relative">
-                      <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base font-mono uppercase" placeholder="00:1A:2B:3C:4D:5E" type="text" value={newDevice.mac} onChange={e => setNewDevice({ ...newDevice, mac: e.target.value })} required />
+                      <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base font-mono uppercase" placeholder="00:1A:2B:3C:4D:5E" type="text" value={newDevice.mac} onChange={e => setNewDevice({ ...newDevice, mac: e.target.value })} required />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 dark:text-slate-600 text-xl">fingerprint</span>
                     </div>
                   </div>
@@ -796,22 +820,22 @@ function App() {
               <section className="space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="material-symbols-outlined text-primary text-sm">shield_person</span>
-                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Credenciais Windows (Opcional)</h2>
+                  <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Credenciais (Acesso Remoto)</h2>
                 </div>
                 <div className="space-y-4">
                   <div className="group">
-                    <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Usuário Windows</label>
+                    <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Usuário (SSH / Windows)</label>
                     <div className="relative">
-                      <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="ex: Administrador" type="text" value={newDevice.win_user} onChange={e => setNewDevice({ ...newDevice, win_user: e.target.value })} />
+                      <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="ex: root / admin" type="text" value={newDevice.win_user} onChange={e => setNewDevice({ ...newDevice, win_user: e.target.value })} />
                     </div>
                   </div>
                   <div className="group">
-                    <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Senha Windows</label>
+                    <label className="block text-sm font-medium mb-1.5 ml-1 text-slate-700 dark:text-slate-300">Senha (SSH / Windows)</label>
                     <div className="relative">
-                      <input className="w-full h-14 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="••••••••" type="password" value={newDevice.win_pass} onChange={e => setNewDevice({ ...newDevice, win_pass: e.target.value })} />
+                      <input className="w-full h-14 bg-app-card border border-app-border rounded-xl px-4 focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-base" placeholder="••••••••" type="password" value={newDevice.win_pass} onChange={e => setNewDevice({ ...newDevice, win_pass: e.target.value })} />
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 px-1 italic">* Necessário para comandos remotos se o PC exigir login prévio.</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 px-1 italic">* Necessário para comandos remotos (RPC para Windows ou SSH para Linux).</p>
                 </div>
               </section>
 
@@ -865,7 +889,7 @@ function App() {
       </AnimatePresence>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 px-6 pb-8 pt-3 z-40 ios-blur shadow-[0_-4px_20px_0_rgba(0,0,0,0.05)]">
+      <nav className="fixed bottom-0 w-full bg-app-bg border-t border-app-border px-6 pb-8 pt-3 z-40 ios-blur shadow-[0_-4px_20px_0_rgba(0,0,0,0.05)]">
         <div className="flex justify-between items-center max-w-md mx-auto">
           <button onClick={() => setView('dashboard')} className={`flex flex-col items-center gap-1 transition-all ${view === 'dashboard' ? 'text-primary' : 'text-slate-400'}`}>
             <span className={`material-symbols-outlined ${view === 'dashboard' ? 'fill-icon' : ''}`}>dashboard</span>

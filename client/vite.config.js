@@ -12,8 +12,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Remote Hub PC',
-        short_name: 'RemoteHub',
+        name: 'Remote WakeOnLan PC',
+        short_name: 'WakeOnLan',
         description: 'Central de Controle Profissional para Computadores Windows',
         theme_color: '#137fec',
         background_color: '#101922',
@@ -40,4 +40,12 @@ export default defineConfig({
       }
     })
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3080',
+        changeOrigin: true
+      }
+    }
+  }
 })
