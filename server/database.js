@@ -1,8 +1,16 @@
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const os = require('os');
+const fs = require('fs');
 
-const dbPath = path.resolve(__dirname, 'users.db');
+// Use AppData for the database to avoid permission issues in C:\Program Files
+const appDataDir = path.join(os.homedir(), 'AppData', 'Roaming', 'RemoteHub-PC');
+if (!fs.existsSync(appDataDir)) {
+    fs.mkdirSync(appDataDir, { recursive: true });
+}
+
+const dbPath = path.resolve(appDataDir, 'users.db');
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
@@ -152,6 +160,66 @@ module.exports = {
             db.run("UPDATE users SET theme = ? WHERE id = ?", [theme, userId], function (err) {
                 if (err) reject(err);
                 else resolve({ changes: this.changes });
+            });
+        });
+    },
+    exportUserData: (userId) => {
+        return new Promise((resolve, reject) => {
+            db.all("SELECT * FROM devices WHERE user_id = ?", [userId], (err, devices) => {
+                if (err) return reject(err);
+                db.all("SELECT * FROM logs WHERE user_id = ?", [userId], (err, logs) => {
+                    if (err) return reject(err);
+                    resolve({
+                        version: "1.0",
+                        exportDate: new Date().toISOString(),
+                        devices: devices.map(d => {
+                            const { id, user_id, ...data } = d;
+                            return data;
+                        }),
+                        logs: logs.map(l => {
+                            const { id, user_id, ...data } = l;
+                            return data;
+                        })
+                    });
+                });
+            });
+        });
+    },
+    importUserData: (userId, data) => {
+        return new Promise((resolve, reject) => {
+            db.serialize(() => {
+                db.run("BEGIN TRANSACTION");
+                try {
+                    // Clear existing
+                    db.run("DELETE FROM devices WHERE user_id = ?", [userId]);
+                    db.run("DELETE FROM logs WHERE user_id = ?", [userId]);
+
+                    // Insert devices
+                    const deviceStmt = db.prepare("INSERT INTO devices (user_id, name, ip, mac, type, group_name, win_user, win_pass) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    if (data.devices && Array.isArray(data.devices)) {
+                        data.devices.forEach(d => {
+                            deviceStmt.run(userId, d.name, d.ip, d.mac, d.type, d.group_name, d.win_user, d.win_pass);
+                        });
+                    }
+                    deviceStmt.finalize();
+
+                    // Insert logs
+                    const logStmt = db.prepare("INSERT INTO logs (user_id, message, timestamp) VALUES (?, ?, ?)");
+                    if (data.logs && Array.isArray(data.logs)) {
+                        data.logs.forEach(l => {
+                            logStmt.run(userId, l.message, l.timestamp);
+                        });
+                    }
+                    logStmt.finalize();
+
+                    db.run("COMMIT", (err) => {
+                        if (err) reject(err);
+                        else resolve({ success: true });
+                    });
+                } catch (err) {
+                    db.run("ROLLBACK");
+                    reject(err);
+                }
             });
         });
     }

@@ -375,6 +375,54 @@ function App() {
     }
   };
 
+  const handleExportBackup = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API_URL}/profile/backup/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `remotehub-backup-${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setStatus('Backup exportado com sucesso!');
+    } catch (err) {
+      setError('Erro ao exportar backup');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      setLoading(true);
+      try {
+        const data = JSON.parse(event.target.result);
+        await axios.post(`${API_URL}/profile/backup/import`, data, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setStatus('Backup restaurado com sucesso!');
+        fetchDevices();
+        fetchLogs();
+      } catch (err) {
+        setError(err.response?.data?.message || 'Erro ao importar backup. Verifique o arquivo.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
+
+
   const groupedDevices = devices.reduce((acc, device) => {
     const group = (device.group_name && device.group_name.trim() !== '') ? device.group_name : 'Geral';
     if (!acc[group]) acc[group] = [];
@@ -721,6 +769,39 @@ function App() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-app-card border border-app-border rounded-2xl p-6 space-y-6 shadow-sm">
+              <h3 className="text-app-muted font-bold uppercase tracking-widest text-[10px] ml-1">Backup de Dados</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={handleExportBackup}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 p-4 bg-app-bg border border-app-border rounded-xl text-primary font-bold text-xs hover:bg-primary/5 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">download</span>
+                  Exportar
+                </button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportBackup}
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    disabled={loading}
+                  />
+                  <button
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 p-4 bg-app-bg border border-app-border rounded-xl text-primary font-bold text-xs hover:bg-primary/5 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-sm">upload</span>
+                    Importar
+                  </button>
+                </div>
+              </div>
+              <p className="text-[9px] text-app-muted text-center italic leading-relaxed">
+                Exporte para salvar seus dispositivos e logs. Importar substituirá os dados atuais.
+              </p>
             </div>
 
             <form onSubmit={handleChangePassword} className="bg-app-card border border-app-border rounded-2xl p-6 space-y-6 shadow-sm">

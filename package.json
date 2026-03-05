@@ -1,0 +1,16 @@
+{
+    "name": "remote-hub-pc",
+    "version": "1.1.0",
+    "description": "Remote Shutdown for Windows and Linux/Unraid",
+    "main": "server/server.js",
+    "scripts": {
+        "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+        "build": "cd client && npm run build",
+        "server": "cd server && node server.js",
+        "dev": "npm run server & cd client && npm run dev",
+        "start": "npm run build && npm run server"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+}

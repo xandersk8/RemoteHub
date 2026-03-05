@@ -19,7 +19,9 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Serve static files from the React app dist folder
-app.use(express.static(path.join(__dirname, '../client/dist')));
+// Serve static files from the React app dist folder
+const clientPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientPath));
 
 // Middleware to verify JWT
 const authenticateToken = (req, res, next) => {
@@ -120,7 +122,7 @@ app.put('/api/profile/password', authenticateToken, async (req, res) => {
 
 app.put('/api/profile/theme', authenticateToken, async (req, res) => {
     const { theme } = req.body;
-    if (!['light', 'dark'].includes(theme)) {
+    if (!['light', 'dark', 'purple'].includes(theme)) {
         return res.status(400).json({ message: 'Tema inválido.' });
     }
     try {
@@ -128,6 +130,33 @@ app.put('/api/profile/theme', authenticateToken, async (req, res) => {
         res.json({ message: 'Tema atualizado com sucesso!' });
     } catch (error) {
         res.status(500).json({ message: 'Erro ao atualizar tema.' });
+    }
+});
+
+// Backup endpoints
+app.get('/api/profile/backup/export', authenticateToken, async (req, res) => {
+    try {
+        const data = await db.exportUserData(req.user.id);
+        res.setHeader('Content-disposition', 'attachment; filename=remotehub-backup.json');
+        res.setHeader('Content-type', 'application/json');
+        res.write(JSON.stringify(data, null, 2));
+        res.end();
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao exportar backup.' });
+    }
+});
+
+app.post('/api/profile/backup/import', authenticateToken, async (req, res) => {
+    const backupData = req.body;
+    if (!backupData || !backupData.devices) {
+        return res.status(400).json({ message: 'Arquivo de backup inválido.' });
+    }
+    try {
+        await db.importUserData(req.user.id, backupData);
+        await db.addLog(req.user.id, `Restaurou um backup de dados`);
+        res.json({ message: 'Backup restaurado com sucesso!' });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao importar backup.' });
     }
 });
 
@@ -521,6 +550,11 @@ app.delete('/api/timer/:deviceId', authenticateToken, (req, res) => {
     } else {
         res.status(404).json({ message: 'No timer found for this device' });
     }
+});
+
+// Fallback to React app for any other requests (SPA support)
+app.get('{*path}', (req, res) => {
+    res.sendFile(path.join(clientPath, 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
