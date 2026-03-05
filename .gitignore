@@ -6,3 +6,4 @@ server/users.db
 .DS_Store
 .vscode/
 .idea/
+installer/output/

@@ -548,7 +548,7 @@ function App() {
                       >
                         <div className="p-4 flex items-start justify-between">
                           <div className="flex gap-4">
-                            <div className={`size-12 rounded-xl ${device.isOnline ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'} flex items-center justify-center transition-colors shadow-inner`}>
+                            <div className={`size-12 rounded-xl ${device.isOnline ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-red-500'} flex items-center justify-center transition-colors shadow-inner`}>
                               <span className="material-symbols-outlined text-3xl">
                                 {device.type === 'server' ? 'dns' : device.type === 'laptop' ? 'laptop_mac' : device.type === 'linux' ? 'terminal' : 'desktop_windows'}
                               </span>
@@ -567,30 +567,29 @@ function App() {
                               </div>
                             </div>
                           </div>
-
-                          <div className="flex gap-2">
-                            <button onClick={() => handleEditDevice(device)} className="size-9 rounded-lg border border-app-border text-app-muted hover:bg-app-card transition-all flex items-center justify-center">
-                              <span className="material-symbols-outlined text-xl">settings</span>
-                            </button>
-                            {!device.isOnline && device.mac && (
-                              <button onClick={() => sendWol(device.mac)} className="size-9 rounded-lg bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white transition-all flex items-center justify-center shadow-lg shadow-green-500/5">
-                                <span className="material-symbols-outlined text-xl">bolt</span>
-                              </button>
-                            )}
-                          </div>
+                          <button onClick={() => handleEditDevice(device)} className="size-9 rounded-lg border border-app-border text-app-muted hover:bg-app-card transition-all flex items-center justify-center">
+                            <span className="material-symbols-outlined text-xl">settings</span>
+                          </button>
                         </div>
 
-                        <div className="px-4 pb-4 grid grid-cols-2 gap-3">
+                        <div className="px-4 pb-4 grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => sendWol(device.mac)}
+                            className={`flex items-center justify-center gap-1 py-2 rounded-xl transition-all text-[10px] font-bold border ${device.isOnline || !device.mac ? 'bg-app-bg text-app-muted border-app-border opacity-50 cursor-not-allowed' : 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white border-green-500/20'}`}
+                            disabled={loading || device.isOnline || !device.mac}
+                          >
+                            <span className="material-symbols-outlined text-sm">bolt</span> Ligar
+                          </button>
                           <button
                             onClick={() => sendCommand('restart', device.ip, device.id)}
-                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-app-bg text-app-muted border-app-border cursor-not-allowed' : 'bg-app-bg text-app-text hover:bg-primary hover:text-white border-app-border hover:border-primary'}`}
+                            className={`flex items-center justify-center gap-1 py-2 rounded-xl transition-all text-[10px] font-bold border ${!device.isOnline ? 'bg-app-bg text-app-muted border-app-border opacity-50 cursor-not-allowed' : 'bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white border-blue-500/20'}`}
                             disabled={loading || !device.isOnline}
                           >
                             <span className="material-symbols-outlined text-sm">refresh</span> Reiniciar
                           </button>
                           <button
                             onClick={() => sendCommand('shutdown', device.ip, device.id)}
-                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all text-xs font-bold border ${!device.isOnline ? 'bg-app-bg text-app-muted border-app-border cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-red-500/20'}`}
+                            className={`flex items-center justify-center gap-1 py-2 rounded-xl transition-all text-[10px] font-bold border ${!device.isOnline ? 'bg-app-bg text-app-muted border-app-border opacity-50 cursor-not-allowed' : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-red-500/20'}`}
                             disabled={loading || !device.isOnline}
                           >
                             <span className="material-symbols-outlined text-sm">power_settings_new</span> Desligar
