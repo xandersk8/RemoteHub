@@ -77,6 +77,14 @@ module.exports = {
             });
         });
     },
+    getUserById: (id) => {
+        return new Promise((resolve, reject) => {
+            db.get("SELECT id, username, theme FROM users WHERE id = ?", [id], (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+    },
     addUser: (username, password) => {
         return new Promise((resolve, reject) => {
             const hash = bcrypt.hashSync(password, 10);

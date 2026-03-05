@@ -106,6 +106,16 @@ app.delete('/api/devices/:id', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/api/profile', authenticateToken, async (req, res) => {
+    try {
+        const user = await db.getUserById(req.user.id);
+        if (!user) return res.status(404).json({ message: 'Usuário não encontrado' });
+        res.json({ id: user.id, username: user.username, theme: user.theme || 'light' });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao buscar perfil' });
+    }
+});
+
 app.put('/api/profile/password', authenticateToken, async (req, res) => {
     const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {

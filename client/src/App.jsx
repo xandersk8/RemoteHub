@@ -28,6 +28,7 @@ function App() {
   useEffect(() => {
     if (token) {
       setIsLoggedIn(true);
+      fetchProfile();
       fetchDevices();
     }
   }, [token]);
@@ -143,6 +144,22 @@ function App() {
       setLogs(response.data);
     } catch (err) {
       console.error('Failed to fetch logs');
+    }
+  };
+
+  const fetchProfile = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const { theme: userTheme, username: userCurrentName } = response.data;
+      if (userTheme) {
+        setTheme(userTheme);
+        localStorage.setItem('theme', userTheme);
+      }
+      setUsername(userCurrentName);
+    } catch (err) {
+      console.error('Failed to fetch profile');
     }
   };
 
